@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.2
+  Local Intel, version 2.3
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -381,7 +381,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.2</span>
+    <span class="ver" id="aboutVer">Version 2.3</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -406,7 +406,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>EVE login and notifications</h3>
     <p>Log in with EVE to see your characters' notifications in the <b>Character notifications</b> panel: structures under attack, shields and armor lost with the timer, fuel and low power warnings, sov events, wars, kill reports and the rest. Attacks put an <b>ATTACKED</b> tag on the system for an hour.</p>
-    <p>One-time setup:</p>
+    <p>On the official page, <code>https://quietstatic01.github.io/Eve-Intel/</code>, all of this is already set up: just press <b>Log in with EVE</b> in Alerts and settings. A copy hosted anywhere else needs its own one-time setup:</p>
     <ol>
       <li>Put the page on a web address. EVE's login can't return to a file opened from your disk. Two ways:
         <ul>
@@ -415,7 +415,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
         </ul>
       </li>
       <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permission <code>esi-characters.read_notifications.v1</code>, and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
-      <li>Copy the app's <b>Client ID</b> into the Client ID box. The page doesn't need the secret key.</li>
+      <li>Copy the app's <b>Client ID</b> into the Client ID box. The page doesn't need the secret key, so never paste the secret anywhere.</li>
       <li>Press <b>Log in with EVE</b> and approve. Repeat for each character you want.</li>
     </ol>
     <p>Notifications update every 5 minutes, but CCP only refreshes them about every 10, so they can be up to 10 minutes behind. Notifications that were already there when you log in don't alert. Your login is saved in this browser only. <b>Log out</b> removes it and cancels it with CCP.</p>
@@ -492,6 +492,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.3</b> EVE login is ready to use on the official page: its Client ID is built in.</li>
       <li><b>2.2</b> Kills load much faster: zKillboard now sends full killmails, so the page no longer fetches each one separately. Checked against live data. Removed the last region name from the page.</li>
       <li><b>2.1</b> EVE login and character notifications, with alerts and ATTACKED tags.</li>
       <li><b>2.0</b> Watched systems at the top. This About window.</li>
@@ -1624,7 +1625,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.2";
+const APP_VERSION = "2.3";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1736,6 +1737,9 @@ loadWatch();
 const SSO = "https://login.eveonline.com/v2/oauth";
 const SCOPES = "esi-characters.read_notifications.v1";
 const callbackUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
+// the official copy of this page has its own EVE app; copies hosted elsewhere need their own Client ID
+const HOME_URL = "https://quietstatic01.github.io/Eve-Intel/", HOME_CLIENT = "398b1ea0b5714cc38e240a3cbf836079";
+if (!cfg.ssoClient && callbackUrl() === HOME_URL) { cfg.ssoClient = HOME_CLIENT; $("#ssoClient").value = HOME_CLIENT; }
 let chars = [];
 try { chars = JSON.parse(ls.get("chars", "[]")) || []; } catch {}
 const saveChars = () => ls.set("chars", JSON.stringify(chars));

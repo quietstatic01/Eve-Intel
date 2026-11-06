@@ -8,9 +8,9 @@ Everything runs in your browser from the single `index.html` file. Press **About
 
 ## EVE login (for character notifications)
 
-1. Create an application at https://developers.eveonline.com with the permission `esi-characters.read_notifications.v1`.
-2. Set its callback URL to the page's address, for example `https://quietstatic01.github.io/Eve-Intel/`. Copy it from **EVE login** in Alerts and settings so it matches exactly, including capital letters.
-3. Paste the app's Client ID into the page and press **Log in with EVE**.
+On the page above, open **Alerts and settings** and press **Log in with EVE**. The app is already registered and its Client ID is built in.
+
+A copy hosted at another address needs its own app at https://developers.eveonline.com with the permission `esi-characters.read_notifications.v1`, a callback URL that matches that address exactly, and its Client ID pasted into the page. The page never needs the app's secret.
 
 ## Data
 
