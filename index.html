@@ -1,0 +1,1993 @@
+<!doctype html>
+<!--
+  Local Intel, version 2.1
+  MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
+  (#about: the instructions and the version history) so it describes the page as it now is.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Intel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header strip, then a jump-ring map beside a sortable system table, then a kill feed. */
+:root {
+  --bg: #0b0f14;
+  --panel: #111821;
+  --line: #1f2a36;
+  --fg: #d6e1ea;
+  --muted: #7d8fa0;
+  --accent: #4fb3d9;
+  --hot: #ff5a3c;
+  --warm: #f2a33a;
+  --cool: #3a7ca5;
+  --ok: #57c47a;
+  --intel: #d65cff;
+  --sov: #e6c84a;
+  --display: "Chakra Petch", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 40px;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1400px; margin: 0 auto; display: grid; gap: 16px; }
+
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+h1 { font: 700 28px/1 var(--display); letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h1 small { display: block; font: 500 12px/1.4 var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-top: 6px; }
+h2 { font: 600 13px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font: 12px var(--mono); color: var(--muted); }
+.controls input, .controls select, .controls button {
+  font: 13px var(--mono); background: var(--panel); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px;
+}
+.controls input { width: 9em; text-transform: uppercase; }
+.controls button { cursor: pointer; border-color: var(--accent); color: var(--accent); }
+.controls button:hover { background: var(--accent); color: var(--bg); }
+#status { font: 12px var(--mono); color: var(--muted); min-height: 1.4em; }
+#status.err { color: var(--hot); }
+
+.summary { display: flex; flex-wrap: wrap; gap: 24px; font: 12px var(--mono); color: var(--muted); }
+.summary b { display: block; font: 600 22px var(--display); color: var(--fg); }
+.summary .hotv b { color: var(--hot); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+/* right column: systems and intel each take half the map's height and scroll inside */
+.grid { align-items: stretch; }
+.col { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; min-width: 0; contain: size; }
+.col > .panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.col .tablebox, .col #intelFeed { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.col thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+@media (max-width: 960px) { .col { contain: none; grid-template-rows: 420px 420px; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+
+#map { width: 100%; height: auto; display: block; }
+#map text { font-family: var(--mono); font-size: 10px; fill: var(--fg); pointer-events: none; }
+#map .ring { fill: none; stroke: var(--line); stroke-dasharray: 2 4; }
+#map .ringlbl { fill: var(--muted); font-size: 9px; }
+#map .rat { fill: url(#ratGlow); pointer-events: none; }
+#map .ratlbl { fill: var(--ok); font-size: 9px; }
+#map .edge { stroke: #2c3b4b; stroke-width: 1; }
+#map .node { cursor: pointer; stroke: var(--bg); stroke-width: 2; }
+#map .node.sel { stroke: var(--fg); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font: 11px var(--mono); color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
+th { text-align: right; font: 600 11px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 6px 7px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+th:first-child, td:first-child, th.l, td.l { text-align: left; }
+th[aria-sort] { color: var(--accent); }
+td { text-align: right; padding: 6px 7px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr.sel td { background: #16212d; }
+tr:hover td { background: #141d27; }
+.sys { font-weight: 500; }
+.sec { font-size: 11px; margin-left: 4px; }
+.zero { color: #3b4856; }
+.pill { display: inline-block; min-width: 2.2em; padding: 1px 6px; border-radius: 10px; text-align: center; }
+.pill.h { background: rgba(255,90,60,.18); color: var(--hot); }
+.pill.w { background: rgba(242,163,58,.16); color: var(--warm); }
+.sov { color: var(--muted); max-width: 16em; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom; }
+
+.feed { display: grid; gap: 0; }
+.kill { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.kill .t { font: 12px var(--mono); color: var(--muted); }
+.kill .t.fresh { color: var(--hot); }
+.kill .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kill .who { color: var(--muted); }
+.kill .v { font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font: 12px var(--mono); padding: 10px 0; }
+.intelbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font: 12px var(--mono); color: var(--muted); margin-bottom: 8px; }
+.intelbar input, .intelbar select, .intelbar button { font: 13px var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+.intelbar input { width: 11em; }
+.intelbar button { cursor: pointer; border-color: var(--intel); color: var(--intel); }
+.intelbar button:hover { background: var(--intel); color: var(--bg); }
+#intelStatus { font: 12px var(--mono); color: var(--muted); margin-bottom: 6px; }
+#intelStatus.err { color: var(--hot); }
+.rep { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.rep .t { font: 12px var(--mono); color: var(--muted); }
+.rep .t.fresh { color: var(--intel); }
+.rep .msg { min-width: 0; overflow-wrap: anywhere; }
+.rep .by { color: var(--muted); }
+.rep mark { background: rgba(214,92,255,.2); color: var(--intel); border-radius: 3px; padding: 0 3px; font-family: var(--mono); font-size: 12px; }
+.rep mark.clr { background: rgba(87,196,122,.18); color: var(--ok); }
+.rep.near .msg { font-weight: 500; }
+.pill.i { background: rgba(214,92,255,.18); color: var(--intel); }
+.pill.c { background: rgba(87,196,122,.15); color: var(--ok); }
+#map .youring { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 3 3; }
+#map .youlbl { fill: var(--fg); font-weight: 600; }
+.you { font: 600 10px var(--mono); color: var(--bg); background: var(--fg); border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+#youStatus { font: 12px var(--mono); color: var(--fg); margin-bottom: 6px; }
+#youStatus:empty { display: none; }
+#map .intelring { fill: none; stroke: var(--intel); stroke-width: 2; }
+@media (prefers-reduced-motion: no-preference) { #map .intelring.live { animation: ping 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; } }
+@keyframes ping { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
+.settings > summary { cursor: pointer; font: 600 13px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); list-style: none; }
+.settings > summary::-webkit-details-marker { display: none; }
+.settings > summary::before { content: "+ "; color: var(--accent); }
+.settings[open] > summary::before { content: "\2013  "; }
+.setgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 12px; }
+.setgrid fieldset { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; margin: 0; display: grid; gap: 8px; align-content: start; min-width: 0; font: 12px var(--mono); color: var(--fg); }
+.setgrid legend { font: 600 11px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 4px; }
+.setgrid label { display: flex; gap: 8px; align-items: center; }
+.setgrid select, .setgrid input[type=text] { font: 13px var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; min-width: 0; flex: 1; }
+.setgrid button { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 5px 9px; cursor: pointer; }
+.setgrid button:hover { background: var(--accent); color: var(--bg); }
+.note { color: var(--muted); font: 11px var(--mono); }
+.watchbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.watchbar h2 { margin: 0; }
+.watchform { display: flex; gap: 8px; flex: 1 1 320px; max-width: 620px; min-width: 0; }
+.watchform input { flex: 1; min-width: 0; font: 13px var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+.watchform button, .wcard button { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 4px 9px; cursor: pointer; }
+.watchform button:hover, .wcard button:hover { background: var(--accent); color: var(--bg); }
+#watchNote { margin-top: 6px; }
+.watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.watchgrid:empty { display: none; }
+.wcard { border: 1px solid var(--line); border-radius: 4px; padding: 10px; display: grid; gap: 7px; font: 12px var(--mono); min-width: 0; background: var(--bg); }
+.wcard.hot { border-color: var(--hot); }
+.wcard.intel { border-color: var(--intel); }
+.wcard .wh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; }
+.wcard .wname { font: 600 16px var(--display); color: var(--fg); margin-right: 4px; }
+.wcard .wstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.wcard .wstats b { display: block; font: 500 14px var(--mono); color: var(--fg); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.wcard .wstats b.hot { color: var(--hot); }
+.wcard .wstats b.zero { color: #3b4856; }
+.wcard .wintel { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcard .wintel.live { color: var(--intel); }
+.wcard .wfoot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.wcard .wfoot span:last-child { display: flex; gap: 6px; align-items: center; }
+dialog.about { width: min(780px, calc(100vw - 32px)); max-height: 86vh; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+dialog.about::backdrop { background: rgba(0, 0, 0, .6); }
+.abouthead { position: sticky; top: 0; display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.abouthead h2 { margin: 0; font-size: 18px; color: var(--fg); letter-spacing: .04em; text-transform: none; }
+.abouthead .ver { font: 12px var(--mono); color: var(--accent); }
+.abouthead button { margin-left: auto; font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+.aboutbody { padding: 4px 18px 20px; font-size: 13.5px; line-height: 1.55; }
+.aboutbody h3 { font: 600 13px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 20px 0 6px; }
+.aboutbody p, .aboutbody ul, .aboutbody ol { margin: 0 0 8px; max-width: 68ch; }
+.aboutbody ul, .aboutbody ol { padding-left: 20px; }
+.aboutbody li { margin-bottom: 3px; }
+.aboutbody code { font: 12px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+.aboutbody table { width: auto; font: 12px var(--mono); margin-bottom: 8px; }
+.aboutbody td { text-align: left; padding: 4px 14px 4px 0; white-space: normal; vertical-align: top; line-height: 1.45; }
+.aboutbody td:first-child { white-space: nowrap; color: var(--fg); }
+.aboutbody tr:hover td { background: none; }
+.aboutbody .hist b { font-family: var(--mono); color: var(--fg); }
+.note.err { color: var(--hot); }
+.note code { font: 11px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; overflow-wrap: anywhere; }
+.charlist { display: grid; gap: 6px; }
+.charlist:empty { display: none; }
+.charrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.charrow button { margin-left: auto; }
+#notifPanel .feed { max-height: 340px; overflow: auto; overscroll-behavior: contain; }
+#notifPanel .kill .what { white-space: normal; }
+#notifNote { margin-bottom: 6px; }
+.chip { display: inline-block; font: 600 10px var(--mono); padding: 0 4px; border-radius: 3px; margin-left: 5px; vertical-align: 1px; letter-spacing: .03em; white-space: nowrap; }
+.chip.camp, .chip.loss, .chip.red { background: rgba(255,90,60,.2); color: var(--hot); }
+.chip.big { background: rgba(242,163,58,.2); color: var(--warm); }
+.chip.wh, .chip.blue { background: rgba(79,179,217,.18); color: var(--accent); }
+.chip.win { background: rgba(87,196,122,.18); color: var(--ok); }
+.chip.flag { background: rgba(214,92,255,.18); color: var(--intel); }
+.pilots { display: grid; gap: 2px; margin-top: 4px; font: 11.5px var(--mono); color: var(--muted); }
+.pilots a { color: var(--fg); }
+.spark { display: block; margin-left: auto; }
+.spark rect { fill: var(--hot); }
+.spark rect.base { fill: var(--line); }
+.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1; }
+.whs { flex-basis: 100%; font: 12px var(--mono); color: var(--muted); }
+.summary .whs b { display: inline; font: 500 12px var(--mono); color: var(--accent); }
+#map .tag { font-size: 9px; font-weight: 600; }
+#map .tag.camp { fill: var(--hot); }
+#map .tag.big { fill: var(--warm); }
+#map .tag.wh { fill: var(--accent); }
+#map .tag.sov { fill: var(--sov); }
+#map .tag.ess { fill: var(--ok); }
+.chip.sov { background: rgba(230,200,74,.18); color: var(--sov); }
+.chip.ess { background: rgba(87,196,122,.18); color: var(--ok); }
+.chip.struct { background: rgba(255,90,60,.2); color: var(--hot); }
+#tbl.nosov .sovcol { display: none; }
+footer { font: 11px var(--mono); color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .node { transition: r .4s ease, fill .4s ease; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Local Intel<small id="subtitle">Enter a system to start</small></h1>
+    <form class="controls" id="cfg">
+      <label for="origin">System</label>
+      <input id="origin" value="" placeholder="System name" autocomplete="off" spellcheck="false">
+      <label for="radius">Jumps</label>
+      <select id="radius"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+      <button type="submit">Load</button>
+      <button type="button" id="refresh">Refresh</button>
+      <button type="button" id="aboutBtn">About</button>
+    </form>
+  </header>
+
+  <section class="panel" id="watchPanel">
+    <div class="watchbar">
+      <h2>Watched systems</h2>
+      <form class="watchform" id="watchForm">
+        <input id="watch" aria-label="Systems to watch" placeholder="System names to watch, comma separated" autocomplete="off" spellcheck="false">
+        <button type="submit">Watch</button>
+      </form>
+    </div>
+    <div class="note" id="watchNote">Watch systems anywhere in New Eden, even ones off the map. Kills, intel, gate camps and sov fights there are tracked and can alert you.</div>
+    <div class="watchgrid" id="watchGrid"></div>
+  </section>
+
+  <div id="status">Starting…</div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Gate map</h2>
+      <svg id="map" viewBox="0 0 600 600" role="img" aria-label="Systems arranged in rings by jump distance"></svg>
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>kill in last hour</span>
+        <span><i style="background:var(--warm)"></i>kill in last 6 h</span>
+        <span><i style="background:var(--cool)"></i>jumps only</span>
+        <span><i style="background:#2a3542"></i>quiet</span>
+        <span><i style="background:none;border:2px solid var(--intel)"></i>reported in intel, last 15 min (n) = reported pilots</span>
+        <span><i style="background:none;border:1.5px dashed var(--fg)"></i>you</span>
+        <span id="ratLegend"><i style="background:radial-gradient(#57c47a,transparent)"></i>green glow = NPC kills, last hour (ratting)</span>
+        <span>size = ship jumps, last hour</span>
+        <span style="color:var(--hot)">CAMP</span><span style="color:var(--warm)">big ships</span><span style="color:var(--accent)">TH / TU wormhole</span>
+        <span id="sovLegend"><span style="color:var(--sov)">VULN / FIGHT</span> sov hub vulnerable / sov fight · <span style="color:var(--ok)">ESS</span> ESS reported</span>
+      </div>
+    </section>
+
+    <div class="col">
+    <section class="panel">
+      <h2>Systems</h2>
+      <div class="tablebox">
+        <table id="tbl">
+          <thead><tr>
+            <th class="l" data-k="name">System</th>
+            <th data-k="dist">Jumps</th>
+            <th data-k="k1">Kills 1h</th>
+            <th data-k="k24">Kills 24h</th>
+            <th data-k="ship_kills" title="ESI hourly: ship kills / pod kills">Ship/pod</th>
+            <th data-k="npc_kills" title="ESI hourly: NPC kills (ratting)">Rats</th>
+            <th data-k="jumps" title="ESI hourly: ship jumps">Jumps 1h</th>
+            <th data-k="intelAge" title="Minutes since last intel report">Intel</th>
+            <th data-k="intelCount" title="Latest pilot count reported in intel, e.g. +5 or 5 nv">Reported</th>
+            <th class="sovcol" data-k="adm" title="Sov hub ADM (activity defense multiplier) and vulnerability window">ADM</th>
+            <th data-k="k24" title="Kills per hour over the last 24 hours">Trend</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+  <section class="panel" id="intelPanel">
+      <h2>Intel and location</h2>
+      <div class="intelbar">
+        <button type="button" id="intelConnect">Connect chat logs folder</button>
+        <button type="button" id="intelReconnect" hidden>Reconnect folder</button>
+        <label for="intelChannels">Channels</label>
+        <input id="intelChannels" placeholder="e.g. insmother.intel" autocomplete="off" spellcheck="false">
+        <label for="intelFilter">Show</label>
+        <select id="intelFilter"><option value="all">All intel</option><option value="map">Only systems on the map</option></select>
+      </div>
+      <div id="youStatus"></div>
+      <div id="intelStatus">Type your intel channel's name, then pick EVE's chat log folder: Documents\EVE\logs\Chatlogs. Your location is read from your Local chat log. Works in Chrome or Edge.</div>
+      <div class="feed" id="intelFeed"></div>
+    </section>
+    </div>
+  </div>
+
+<details class="panel settings" id="settings">
+    <summary>Alerts and settings</summary>
+    <div class="setgrid">
+      <fieldset>
+        <legend>Alerts</legend>
+        <label>Alert on intel within <select id="alRange"><option value="-1">Off</option><option value="0">0 jumps</option><option value="1">1 jump</option><option value="2">2 jumps</option><option value="3">3 jumps</option><option value="4">4 jumps</option><option value="5">5 jumps</option></select></label>
+        <label>Count jumps from <select id="alFrom"><option value="you">Where I am</option><option value="home">The map's center</option></select></label>
+        <label><input type="checkbox" id="alSound"> Play a sound</label>
+        <label><input type="checkbox" id="alDesktop"> Show desktop pop-ups</label>
+        <label><input type="checkbox" id="alSpeak"> Read alerts out loud</label>
+        <label><input type="checkbox" id="alKills"> Also alert on new kills and gate camps in range</label>
+        <label><input type="checkbox" id="alBig"> Always alert on capitals, dictors, HICs and Black Ops anywhere on the map</label>
+        <label><input type="checkbox" id="alWatch"> Always alert on intel, kills, gate camps and sov fights in watched systems</label>
+        <label><input type="checkbox" id="alSov"> Alert on sov fights and structure kills anywhere on the map, and ESS reports in range</label>
+        <div><button type="button" id="alTest">Test alert</button></div>
+        <div class="note" id="alNote"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Map</legend>
+        <label><input type="checkbox" id="follow"> Follow me: re-center the map when I jump</label>
+        <label><input type="checkbox" id="showRats"> Show ratting activity (green glow)</label>
+        <label><input type="checkbox" id="showSov"> Show sov timers, sov fights, structure kills and ESS reports</label>
+        <label><input type="checkbox" id="showWh"> Show Thera and Turnur wormholes</label>
+        <div class="note">Following and "where I am" need the chat logs folder connected.</div>
+        <div class="note" id="whNote"></div>
+      </fieldset>
+      <fieldset>
+        <legend>EVE login</legend>
+        <div class="note">Lets the page read your characters' notifications: structure attacks and timers, fuel, sov, wars. Read-only. Your login stays in this browser.</div>
+        <label>Client ID <input type="text" id="ssoClient" placeholder="From developers.eveonline.com" autocomplete="off" spellcheck="false"></label>
+        <div class="note">Callback URL for your app: <code id="ssoCb"></code> <button type="button" id="ssoCopy">Copy</button></div>
+        <div><button type="button" id="ssoLogin">Log in with EVE</button></div>
+        <div class="charlist" id="ssoChars"></div>
+        <label><input type="checkbox" id="alNotif"> Alert on attacks, reinforcements, sov and war notifications</label>
+        <label><input type="checkbox" id="alNotifWarn"> Also alert on fuel, low power and service warnings</label>
+        <div class="note" id="ssoNote"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Standings</legend>
+        <label>Friendly <input type="text" id="friends" placeholder="Alliance or corp names, comma separated" autocomplete="off" spellcheck="false"></label>
+        <label>Hostile <input type="text" id="enemies" placeholder="Alliance or corp names, comma separated" autocomplete="off" spellcheck="false"></label>
+        <label><input type="checkbox" id="hideFriendly"> Hide friendly losses from the kill feed</label>
+        <div class="note" id="standNote">Use full names, not tickers.</div>
+      </fieldset>
+    </div>
+  </details>
+
+<section class="panel" id="notifPanel">
+    <h2>Character notifications</h2>
+    <div class="note" id="notifNote"></div>
+    <div class="feed" id="notifFeed"></div>
+  </section>
+
+  <section class="panel">
+    <h2 id="feedtitle">Kills, last 24 hours</h2>
+    <div class="feed" id="feed"><div class="empty">Loading killmails…</div></div>
+  </section>
+
+  <footer>
+    Data: EVE Swagger Interface (hourly kill and jump stats, gate map, sovereignty, routes), zKillboard (killmails, pilot stats) and EVE-Scout (Thera and Turnur connections).
+    Sov structures and sov fights refresh every 10 minutes. ESS bank values and structure reinforcement timers aren't public, so they can't be shown.
+    Pilot flags such as "cloaky hunter?" and "cyno alt?" are guesses from zKillboard history.
+    ESI system stats are cached by CCP for up to an hour. The kill feed refreshes every 2 minutes and the hourly stats every 10.
+  </footer>
+</div>
+
+<dialog class="about" id="about" aria-labelledby="aboutTitle">
+  <div class="abouthead">
+    <h2 id="aboutTitle">Local Intel</h2>
+    <span class="ver" id="aboutVer">Version 2.1</span>
+    <button type="button" id="aboutClose">Close</button>
+  </div>
+  <div class="aboutbody">
+    <p>A live picture of the space around you in EVE Online: kills, traffic, ratting, intel, sov and wormholes, with alerts. It runs entirely in your browser from this one file.</p>
+
+    <h3>Getting started</h3>
+    <ol>
+      <li>Open the page in Chrome or Edge on the computer that runs EVE.</li>
+      <li>Type a system name at the top right, choose how many jumps around it to cover (1 to 5) and press <b>Load</b>. Or connect your chat logs folder (see Intel and location) and the page starts in the system you're in.</li>
+      <li>Open <b>Alerts and settings</b>, below the map, to choose what alerts you and how.</li>
+    </ol>
+    <p>A link like <code>index.html?system=NAME&amp;jumps=3</code> always opens that system. Otherwise the page starts where you are, or in the last system you loaded.</p>
+
+    <h3>Watched systems</h3>
+    <ul>
+      <li>Type system names into the box at the top, separated by commas, and press <b>Watch</b>. They can be anywhere, on the map or not.</li>
+      <li>Each card shows kills in the last hour and 24 hours, ship jumps and NPC kills in the last hour, the latest intel that mentions it, how far it is from you, and tags for gate camps, big ships, sov, ESS and wormholes.</li>
+      <li><b>Center map</b> moves the map to that system. <b>Remove</b> stops watching it.</li>
+      <li>With "Always alert on … watched systems" on, any intel, new kill, gate camp or sov fight there alerts you, however far away it is.</li>
+      <li>Kills in watched systems also appear in the kill feed, marked "watched".</li>
+    </ul>
+
+    <h3>EVE login and notifications</h3>
+    <p>Log in with EVE to see your characters' notifications in the <b>Character notifications</b> panel: structures under attack, shields and armor lost with the timer, fuel and low power warnings, sov events, wars, kill reports and the rest. Attacks put an <b>ATTACKED</b> tag on the system for an hour.</p>
+    <p>One-time setup:</p>
+    <ol>
+      <li>Put the page on a web address. EVE's login can't return to a file opened from your disk. Two ways:
+        <ul>
+          <li><b>GitHub Pages</b>: make a repository, upload this file as <code>index.html</code>, then in the repository's Settings → Pages choose to deploy from the main branch. The page appears at <code>https://YOUR-NAME.github.io/REPOSITORY/</code>.</li>
+          <li><b>Your own computer</b>: in the folder with the file, run <code>python -m http.server 8000</code> and open <code>http://localhost:8000/</code>.</li>
+        </ul>
+      </li>
+      <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permission <code>esi-characters.read_notifications.v1</code>, and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
+      <li>Copy the app's <b>Client ID</b> into the Client ID box. The page doesn't need the secret key.</li>
+      <li>Press <b>Log in with EVE</b> and approve. Repeat for each character you want.</li>
+    </ol>
+    <p>Notifications update every 5 minutes, but CCP only refreshes them about every 10, so they can be up to 10 minutes behind. Notifications that were already there when you log in don't alert. Your login is saved in this browser only. <b>Log out</b> removes it and cancels it with CCP.</p>
+
+    <h3>Gate map</h3>
+    <ul>
+      <li>Systems sit in rings by jumps from the center. Lines are stargates.</li>
+      <li>Dot color: red is a kill in the last hour, orange a kill in the last 6 hours, blue is ship traffic only, grey is quiet. Bigger dots mean more ship jumps in the last hour.</li>
+      <li>Green glow is ratting: NPC kills in the last hour. The label shows rats per hour.</li>
+      <li>A purple ring is a system named in intel in the last 15 minutes. It pulses for the first 3 minutes. A number in brackets is the reported pilot count.</li>
+      <li>A dashed ring and YOU mark where your character is.</li>
+      <li>Labels: <b>CAMP</b> possible gate camp, big ship type (e.g. DICTOR), <b>VULN</b> sov hub vulnerable, <b>FIGHT</b> sov fight, <b>ESS</b> ESS activity reported, <b>ATTACKED</b> a structure attack from your notifications, <b>TH</b>/<b>TU</b> Thera or Turnur wormhole.</li>
+      <li>Click a system to show only its kills in the kill feed. Click it again to show all.</li>
+    </ul>
+
+    <h3>Systems table</h3>
+    <table>
+      <tr><td>Jumps</td><td>Distance from the map's center.</td></tr>
+      <tr><td>Kills 1h, 24h</td><td>From zKillboard, up to 200 per system.</td></tr>
+      <tr><td>Ship/pod, Rats, Jumps 1h</td><td>CCP's hourly numbers. They can lag by up to an hour.</td></tr>
+      <tr><td>Intel</td><td>Minutes since a report named the system. Green "clr" means the last report said clear.</td></tr>
+      <tr><td>Reported</td><td>Latest pilot count from intel and how old it is.</td></tr>
+      <tr><td>ADM</td><td>Sov hub ADM, plus VULN while vulnerable or the time until the next window, and FIGHT for sov fights. Hover for details.</td></tr>
+      <tr><td>Trend</td><td>Kills per hour over 24 hours. A blue line adds ship jumps per hour, from samples the page takes while it's open.</td></tr>
+    </table>
+    <p>Click a column header to sort. Hover a system name to see who holds sov. The table scrolls sideways when it's wider than the panel.</p>
+
+    <h3>Intel and location</h3>
+    <ul>
+      <li>EVE writes each chat channel to a file on your computer. In EVE's settings, turn on <b>Log Chat to File</b>.</li>
+      <li>Type your intel channel's name exactly as it appears on its tab (several, separated by commas), then click <b>Connect chat logs folder</b> and pick <code>Documents\EVE\logs\Chatlogs</code>. Next time, press <b>Reconnect folder</b>.</li>
+      <li>The page reads new messages every 1.5 seconds. It recognises system names, and shortened names (the first few characters) when only one system matches.</li>
+      <li>Pilot counts: "+5", "5x", "5 nv", "5 reds", "local 12" and "x5". "clr" or "clear" sets the count to 0. A count only applies when a message names one system.</li>
+      <li>Pilot names in intel are looked up: corp, alliance, zKillboard danger and solo %, kills, usual ships. "CLOAKY HUNTER?" and "CYNO ALT?" are guesses from their history.</li>
+      <li>Big-ship words (titan, super, dread, carrier, fax, lancer, rorq, dictor, hic, blops, caps, cyno) and ship names like "Sabre" get tagged.</li>
+      <li>ESS words (ess, linking, main bank, reserve bank, bank) get an ESS tag.</li>
+      <li><b>Show</b> lists all intel, or only messages about systems on the map or watched.</li>
+      <li>Your location comes from your Local chat log, updated within seconds of each jump. With several characters logged in, each one is shown.</li>
+    </ul>
+
+    <h3>Kill feed</h3>
+    <ul>
+      <li>The last 24 hours, newest first, up to 150 kills, with ship, system, gate, victim, attackers and value. Each kill links to zKillboard.</li>
+      <li>Tags: <b>LOSS</b> a friendly died, <b>KILL</b> friendlies got the kill, <b>HOSTILE DOWN</b> a listed hostile died, <b>STRUCTURE</b> a structure died, and big ship types.</li>
+    </ul>
+
+    <h3>Alerts and settings</h3>
+    <ul>
+      <li><b>Alert on intel within N jumps</b>, counted from where you are or from the map's center.</li>
+      <li>Alert as a sound, a desktop pop-up, spoken words, or any mix. The browser tab also flashes when the page is in the background. <b>Test alert</b> shows what you'll get.</li>
+      <li>Optional alerts: new kills and gate camps in range; big ships anywhere on the map; sov fights and structure kills anywhere on the map, and ESS reports in range; anything in watched systems.</li>
+      <li><b>Follow me</b> re-centers the map each time you jump.</li>
+      <li>Switches for ratting glow, sov and ESS, and Thera and Turnur wormholes.</li>
+      <li><b>Standings</b>: full alliance or corp names (not tickers) for friendly and hostile. You can hide friendly losses from the kill feed.</li>
+    </ul>
+    <p>Settings are saved in your browser.</p>
+
+    <h3>How often it updates</h3>
+    <table>
+      <tr><td>Intel and your location</td><td>every 1.5 seconds</td></tr>
+      <tr><td>Kill feed and kill counts</td><td>every 2 minutes</td></tr>
+      <tr><td>Hourly stats, sov, wormholes</td><td>every 10 minutes</td></tr>
+      <tr><td>New log files (after relogging)</td><td>every 30 seconds</td></tr>
+      <tr><td>Character notifications</td><td>every 5 minutes (CCP refreshes about every 10)</td></tr>
+    </table>
+    <p><b>Refresh</b> at the top updates kills, hourly stats and notifications right away.</p>
+
+    <h3>What it can't show</h3>
+    <ul>
+      <li>Local member counts, anomalies and signatures, ESS bank values, other people's structure timers and jump bridges. None of these are published by CCP. Your own structure timers appear only when a notification includes them.</li>
+      <li>Chrome may block desktop pop-ups for a file opened from your disk. Hosting the page on a website fixes that.</li>
+    </ul>
+    <p>Data: CCP's EVE Swagger Interface and EVE login, zKillboard and EVE-Scout.</p>
+
+    <h3>Version history</h3>
+    <ul class="hist">
+      <li><b>2.1</b> EVE login and character notifications, with alerts and ATTACKED tags.</li>
+      <li><b>2.0</b> Watched systems at the top. This About window.</li>
+      <li><b>1.9</b> Sov timers and ADM, sov fights, structure kills, ESS reports from intel. Settings moved below the map.</li>
+      <li><b>1.8</b> Intel filter: all intel or only systems on the map.</li>
+      <li><b>1.7</b> Ratting glow on the map.</li>
+      <li><b>1.6</b> Alerts from where you are, follow me, desktop pop-ups, hostile lookup, gate camp warnings, friend and enemy lists, big-ship warnings, 24-hour trend, spoken alerts, Thera and Turnur wormholes.</li>
+      <li><b>1.5</b> Works for any system and starts where you are.</li>
+      <li><b>1.4</b> Tracks up to 200 kills per system.</li>
+      <li><b>1.3</b> Systems list and intel beside the map, each scrolling.</li>
+      <li><b>1.2</b> Pilot counts from intel and your location on the map.</li>
+      <li><b>1.1</b> Intel channel from EVE's chat logs, with sound alerts.</li>
+      <li><b>1.0</b> Gate map, systems table and kill feed.</li>
+    </ul>
+  </div>
+</dialog>
+
+<script>
+const ESI = "https://esi.evetech.net/latest";
+const ZKB = "https://zkillboard.com/api";
+const DS = "datasource=tranquility";
+const $ = s => document.querySelector(s);
+
+const state = {
+  origin: null, radius: 3, systems: new Map(), // id -> {id,name,sec,dist,neighbors:Set,...}
+  kills: new Map(), oldKills: new Set(), // ids already known to be older than 24 h  // killmail_id -> {id,time,sys,ship,victim,corp,alliance,value}
+  names: new Map(), sel: null, sort: { k: "k24", dir: -1 },
+  gen: 0, target: null, primedFor: null, lastLoadedFor: null, watch: new Map(), watchSeen: new Set(), hourly: null, camps: new Map(), campKeys: new Set(), wh: [], friends: new Set(), enemies: new Set()
+};
+const POSTJSON = body => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+/* ---------- helpers ---------- */
+function setStatus(msg, err) { const s = $("#status"); s.textContent = msg; s.className = err ? "err" : ""; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function getJSON(url, opts = {}, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, opts);
+      if (r.status === 429 || r.status >= 500) { await sleep(1500 * (i + 1)); continue; }
+      if (!r.ok) throw new Error(r.status + " " + url);
+      return await r.json();
+    } catch (e) { if (i === tries - 1) throw e; await sleep(800 * (i + 1)); }
+  }
+  throw new Error("Failed: " + url);
+}
+async function pool(items, n, fn) {
+  const out = []; let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); }
+  }));
+  return out;
+}
+const cache = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+function secColor(s) {
+  const r = Math.round(s * 10) / 10;
+  if (r >= 0.5) return "#57c47a"; if (r > 0) return "#f2a33a"; return "#ff5a3c";
+}
+function fmtSec(s) { return (Math.round(s * 10) / 10).toFixed(1); }
+function ago(t) {
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return "now"; if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60); if (h >= 48) return Math.floor(h / 24) + "d ago";
+  return h + "h " + (m % 60) + "m";
+}
+function isk(v) {
+  if (!v) return "–";
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + "b";
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + "m";
+  return (v / 1e3).toFixed(0) + "k";
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function resolveNames(ids) {
+  const need = [...new Set(ids.filter(id => id && !state.names.has(id)))];
+  for (let i = 0; i < need.length; i += 900) {
+    const chunk = need.slice(i, i + 900);
+    try {
+      const res = await getJSON(`${ESI}/universe/names/?${DS}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(chunk) });
+      res.forEach(r => state.names.set(r.id, r.name));
+    } catch {
+      // one bad id fails the whole batch; fall back to one at a time
+      await pool(chunk, 6, async id => {
+        try { const [r] = await getJSON(`${ESI}/universe/names/?${DS}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify([id]) }, 1); if (r) state.names.set(r.id, r.name); } catch {}
+      });
+    }
+  }
+}
+const nm = id => state.names.get(id) || (id ? "#" + id : "");
+
+/* ---------- topology (cached per system, gates rarely change) ---------- */
+async function systemInfo(id) {
+  const key = "sys2:" + id;
+  let s = cache.get(key);
+  if (!s) {
+    const d = await getJSON(`${ESI}/universe/systems/${id}/?${DS}`);
+    const gates = await pool(d.stargates || [], 6, g => getJSON(`${ESI}/universe/stargates/${g}/?${DS}`));
+    s = { id, name: d.name, sec: d.security_status, constellation: d.constellation_id, neighbors: gates.map(g => g.destination.system_id),
+          gates: Object.fromEntries(gates.map((g, i) => [d.stargates[i], g.destination.system_id])) };
+    cache.set(key, s);
+  }
+  return s;
+}
+
+async function buildNeighborhood(originName, radius) {
+  setStatus(`Resolving ${originName}…`);
+  const ids = await getJSON(`${ESI}/universe/ids/?${DS}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify([originName]) });
+  const hit = ids.systems && ids.systems[0];
+  if (!hit) throw new Error(`No solar system named "${originName}". Check the spelling.`);
+  const systems = new Map();
+  let frontier = [hit.id];
+  const dist = new Map([[hit.id, 0]]);
+  for (let d = 0; d <= radius; d++) {
+    setStatus(`Mapping gates: ${d} jump${d === 1 ? "" : "s"} out, ${frontier.length} system${frontier.length === 1 ? "" : "s"}…`);
+    const infos = await pool(frontier, 4, systemInfo);
+    const next = [];
+    infos.forEach(s => {
+      systems.set(s.id, { ...s, dist: d });
+      if (d < radius) s.neighbors.forEach(n => { if (!dist.has(n)) { dist.set(n, d + 1); next.push(n); } });
+    });
+    frontier = next;
+  }
+  // region / constellation names for header
+  const o = systems.get(hit.id);
+  try {
+    const c = await getJSON(`${ESI}/universe/constellations/${o.constellation}/?${DS}`);
+    const r = await getJSON(`${ESI}/universe/regions/${c.region_id}/?${DS}`);
+    o.region = r.name; o.constellationName = c.name;
+  } catch {}
+  await resolveNames([...systems.values()].flatMap(x => Object.values(x.gates || {}))); // gate names for camps
+  return { origin: hit.id, systems };
+}
+
+/* ---------- live data ---------- */
+async function loadHourly() {
+  const [kills, jumps, sov] = await Promise.all([
+    getJSON(`${ESI}/universe/system_kills/?${DS}`).catch(() => []),
+    getJSON(`${ESI}/universe/system_jumps/?${DS}`).catch(() => []),
+    getJSON(`${ESI}/sovereignty/map/?${DS}`).catch(() => [])
+  ]);
+  const km = new Map(kills.map(k => [k.system_id, k]));
+  const jm = new Map(jumps.map(j => [j.system_id, j.ship_jumps]));
+  state.hourly = { km, jm }; applyHourly();
+  const sm = new Map(sov.map(s => [s.system_id, s.alliance_id || s.faction_id]));
+  for (const s of state.systems.values()) {
+    const k = km.get(s.id) || {};
+    s.ship_kills = k.ship_kills || 0; s.pod_kills = k.pod_kills || 0; s.npc_kills = k.npc_kills || 0;
+    s.jumps = jm.get(s.id) || 0; s.sovId = sm.get(s.id) || null;
+  }
+  const hk = Math.floor(Date.now() / 36e5);
+  for (const s of state.systems.values()) {
+    const h = (jumpHist[s.id] ||= {}); h[hk] = s.jumps;
+    for (const k of Object.keys(h)) if (+k < hk - 48) delete h[k];
+  }
+  ls.set("jumpHist", JSON.stringify(jumpHist));
+  await resolveNames([...state.systems.values()].map(s => s.sovId));
+  for (const s of state.systems.values()) s.sov = s.sovId ? nm(s.sovId) : "";
+}
+
+const DAY = 864e5;
+const MAX_KILLS_PER_SYSTEM = 200; // zKillboard returns up to 200 per request
+async function loadKills() {
+  const ids = [...new Set([...state.systems.keys(), ...state.watch.keys()])];
+  const cutoff = Date.now() - DAY;
+  // alerts only for kills that are new since the last load of this same map / watchlist
+  const sysRef = state.systems, primed = state.primedFor === sysRef, added = [];
+  const wPrimed = new Set(state.watchSeen), watchNow = new Set(state.watch.keys());
+  let done = 0;
+  // zKillboard asks for gentle use: 2 at a time.
+  await pool(ids, 2, async sid => {
+    let list = [];
+    try { list = await getJSON(`${ZKB}/kills/systemID/${sid}/`, { headers: { "Accept": "application/json" } }); } catch { list = []; }
+    if (!Array.isArray(list)) list = [];
+    // newest first; read details 10 at a time and stop at the first killmail older than 24 h
+    const items = list.slice(0, MAX_KILLS_PER_SYSTEM);
+    for (let i = 0; i < items.length; i += 10) {
+      let reachedOld = false;
+      const fresh = items.slice(i, i + 10).filter(z => {
+        if (state.oldKills.has(z.killmail_id)) { reachedOld = true; return false; }
+        return !state.kills.has(z.killmail_id);
+      });
+      await pool(fresh, 10, async z => {
+        let km;
+        try { km = await getJSON(`${ESI}/killmails/${z.killmail_id}/${z.zkb.hash}/?${DS}`); } catch { return; }
+        const t = Date.parse(km.killmail_time);
+        if (t < cutoff) { state.oldKills.add(z.killmail_id); reachedOld = true; return; }
+        const k = {
+          id: z.killmail_id, time: t, sys: km.solar_system_id, ship: km.victim.ship_type_id,
+          victim: km.victim.character_id, corp: km.victim.corporation_id, alliance: km.victim.alliance_id,
+          attackers: km.attackers.length, value: z.zkb.totalValue, npc: z.zkb.npc, loc: z.zkb.locationID,
+          atk: [...new Set(km.attackers.flatMap(a => [a.alliance_id, a.corporation_id]).filter(Boolean))],
+          atkShips: [...new Set(km.attackers.map(a => a.ship_type_id).filter(Boolean))]
+        };
+        state.kills.set(z.killmail_id, k); added.push(k);
+      });
+      if (reachedOld) break;
+    }
+    done++; if (done % 4 === 0 || done === ids.length) setStatus(`Reading killmails: ${done}/${ids.length} systems…`);
+  });
+  for (const [id, k] of state.kills) if (k.time < cutoff) { state.kills.delete(id); state.oldKills.add(id); }
+  const recent = [...state.kills.values()];
+  await resolveNames(recent.flatMap(k => [k.ship, k.victim, k.corp, k.alliance]));
+  await loadGroups(added.flatMap(k => [k.ship, ...k.atkShips]));
+  await loadCats(added.map(k => typeGroup[k.ship]));
+  state.lastLoadedFor = sysRef; state.watchSeen = watchNow; state.watchPrimedPrev = wPrimed;
+  killAlerts(added, primed, wPrimed);
+}
+
+function computeCounts() {
+  const now = Date.now();
+  for (const s of state.systems.values()) { s.k1 = 0; s.k6 = 0; s.k24 = 0; s.bigK = new Set(); }
+  for (const k of state.kills.values()) {
+    const s = state.systems.get(k.sys); if (!s) continue;
+    const age = now - k.time;
+    if (age < 36e5) { s.k1++; killBig(k).forEach(b => s.bigK.add(b)); }
+    if (age < 6 * 36e5) s.k6++; s.k24++;
+  }
+}
+
+/* ---------- render ---------- */
+function heat(s) {
+  if (s.k1 > 0) return "var(--hot)";
+  if (s.k6 > 0) return "var(--warm)";
+  if (s.jumps > 0) return "var(--cool)";
+  return "#2a3542";
+}
+
+function layout() {
+  // rings by distance; order each ring by the average angle of its parents to keep edges short
+  const byD = [];
+  for (const s of state.systems.values()) (byD[s.dist] ||= []).push(s);
+  const pos = new Map();
+  const C = 300, step = 270 / Math.max(1, state.radius);
+  byD.forEach((ring, d) => {
+    if (d === 0) { pos.set(ring[0].id, { x: C, y: C, a: 0 }); return; }
+    ring.forEach(s => {
+      const ps = s.neighbors.filter(n => pos.has(n) && state.systems.get(n).dist === d - 1).map(n => pos.get(n).a);
+      s._a = ps.length ? Math.atan2(ps.reduce((a, b) => a + Math.sin(b), 0), ps.reduce((a, b) => a + Math.cos(b), 0)) : 0;
+    });
+    ring.sort((a, b) => a._a - b._a);
+    const off = d === 1 ? -Math.PI / 2 : ring[0]._a;
+    ring.forEach((s, i) => {
+      const a = d === 1 ? off + (i / ring.length) * 2 * Math.PI : s._a;
+      pos.set(s.id, { a, x: 0, y: 0 });
+    });
+    // spread evenly while keeping order, anchored near parent angles
+    const n = ring.length, sp = 2 * Math.PI / n;
+    if (d > 1) {
+      let base = ring.reduce((acc, s, i) => acc + Math.sin(s._a - i * sp), 0);
+      let baseC = ring.reduce((acc, s, i) => acc + Math.cos(s._a - i * sp), 0);
+      const start = Math.atan2(base, baseC);
+      ring.forEach((s, i) => pos.get(s.id).a = start + i * sp);
+    }
+    ring.forEach(s => { const p = pos.get(s.id); p.x = C + Math.cos(p.a) * step * d; p.y = C + Math.sin(p.a) * step * d; });
+  });
+  return pos;
+}
+
+function renderMap() {
+  const attacked = attackedSystems();
+  const svg = $("#map"), pos = layout(), whBySys = whMap(), sovBySys = sovMap(), fightBySys = fightMap();
+  const maxJ = Math.max(1, ...[...state.systems.values()].map(s => s.jumps || 0));
+  let h = `<defs><radialGradient id="ratGlow"><stop offset="0%" stop-color="#57c47a" stop-opacity=".55"/><stop offset="100%" stop-color="#57c47a" stop-opacity="0"/></radialGradient></defs>`;
+  // ratting: green glow behind each system, sized by NPC kills in the last hour
+  const maxR = Math.max(1, ...[...state.systems.values()].map(s => s.npc_kills || 0));
+  if (cfg.showRats) for (const s of state.systems.values()) if (s.npc_kills) {
+    const p = pos.get(s.id), f = Math.sqrt(s.npc_kills / maxR);
+    h += `<circle class="rat" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(14 + 30 * f).toFixed(1)}" opacity="${(0.35 + 0.65 * f).toFixed(2)}"/>`;
+  }
+  for (let d = 1; d <= state.radius; d++) {
+    const r = 270 / state.radius * d;
+    h += `<circle class="ring" cx="300" cy="300" r="${r}"/><text class="ringlbl" x="${300 + 4}" y="${300 - r - 4}">${d}j</text>`;
+  }
+  const seen = new Set();
+  for (const s of state.systems.values()) for (const n of s.neighbors) {
+    if (!state.systems.has(n)) continue;
+    const key = s.id < n ? s.id + "-" + n : n + "-" + s.id; if (seen.has(key)) continue; seen.add(key);
+    const a = pos.get(s.id), b = pos.get(n);
+    h += `<line class="edge" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
+  }
+  for (const s of state.systems.values()) {
+    const p = pos.get(s.id);
+    const r = (s.id === state.origin ? 9 : 5) + 9 * Math.sqrt((s.jumps || 0) / maxJ);
+    const tip = `${s.name} (${fmtSec(s.sec)}) · ${s.dist}j · kills 1h ${s.k1} / 24h ${s.k24} · jumps ${s.jumps}`;
+    h += `<g data-id="${s.id}"><title>${esc(tip)}</title><circle class="node${state.sel === s.id ? " sel" : ""}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r.toFixed(1)}" fill="${heat(s)}"/>`;
+    const below = p.y >= 300;
+    if (s.intelAge != null && s.intelAge < 15 && !s.intelClear) {
+      h += `<circle class="intelring" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(r + 4).toFixed(1)}"/>`;
+      if (s.intelAge < 3) h += `<circle class="intelring live" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(r + 4).toFixed(1)}"/>`;
+    }
+    if (s.here?.length) {
+      h += `<circle class="youring" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(r + 8).toFixed(1)}"/>`;
+      h += `<text class="youlbl" x="${p.x.toFixed(1)}" y="${(p.y + (below ? -r - 12 : r + 20)).toFixed(1)}" text-anchor="middle">${esc(s.here.length > 1 ? s.here.length + " of you" : "YOU")}</text>`;
+    }
+    const cnt = s.intelCount != null && s.countAge < 15 ? ` (${s.intelCount})` : "";
+    let tags = "";
+    if (state.camps.has(s.id)) tags += `<tspan class="tag camp"> CAMP</tspan>`;
+    const big = bigTags(s); if (big.length) tags += `<tspan class="tag big"> ${esc(big[0].toUpperCase())}${big.length > 1 ? "+" : ""}</tspan>`;
+    if (cfg.showSov) {
+      if (fightBySys.get(s.id)) tags += `<tspan class="tag sov"> FIGHT</tspan>`;
+      else if (sovBySys.get(s.id)?.vuln) tags += `<tspan class="tag sov"> VULN</tspan>`;
+      if (s.essI) tags += `<tspan class="tag ess"> ESS</tspan>`;
+    }
+    if (attacked.has(s.id)) tags += `<tspan class="tag camp"> ATTACKED</tspan>`;
+    {
+    }
+    const whs = whBySys.get(s.id); if (whs) tags += `<tspan class="tag wh"> ${whs.map(w => w.out_system_name === "Thera" ? "TH" : "TU").join(" ")}</tspan>`;
+    if (cfg.showRats && s.npc_kills) h += `<text class="ratlbl" x="${p.x.toFixed(1)}" y="${(p.y + (below ? r + 21 : -r - 14)).toFixed(1)}" text-anchor="middle">${s.npc_kills} rats/h</text>`;
+    h += `<text x="${p.x.toFixed(1)}" y="${(p.y + (below ? r + 11 : -r - 4)).toFixed(1)}" text-anchor="middle" font-weight="${s.id === state.origin ? 600 : 400}">${esc(s.name)}${s.k1 ? " ·" + s.k1 : ""}${cnt}${tags}</text></g>`;
+  }
+  svg.innerHTML = h;
+}
+
+function renderTable() {
+  const { k, dir } = state.sort;
+  const rows = [...state.systems.values()].sort((a, b) => {
+    const x = a[k], y = b[k];
+    if (typeof x === "string") return dir * x.localeCompare(y);
+    return dir * ((x || 0) - (y || 0)) || a.dist - b.dist || a.name.localeCompare(b.name);
+  });
+  const num = (v, cls) => v ? (cls ? `<span class="pill ${cls}">${v}</span>` : v) : `<span class="zero">0</span>`;
+  const whBySys = whMap(), sovBySys = sovMap();
+  for (const s of state.systems.values()) s.adm = sovBySys.get(s.id)?.adm ?? 0;
+  $("#tbl").classList.toggle("nosov", !cfg.showSov);
+  $("#tbl tbody").innerHTML = rows.map(s => `
+    <tr data-id="${s.id}" class="${state.sel === s.id ? "sel" : ""}">
+      <td title="${esc(s.sov ? "Sov: " + s.sov : "No sov holder")}"><a class="sys" href="https://zkillboard.com/system/${s.id}/" target="_blank" rel="noopener">${esc(s.name)}</a>${s.here?.length ? `<span class="you" title="${esc(s.here.join(", "))}">YOU</span>` : ""}<span class="sec" style="color:${secColor(s.sec)}">${fmtSec(s.sec)}</span>${sysChips(s, whBySys)}</td>
+      <td>${s.dist}</td>
+      <td>${num(s.k1, s.k1 ? "h" : "")}</td>
+      <td>${num(s.k24, s.k24 ? "w" : "")}</td>
+      <td>${s.ship_kills || s.pod_kills ? `${s.ship_kills}/${s.pod_kills}` : `<span class="zero">0</span>`}</td>
+      <td>${num(s.npc_kills)}</td>
+      <td>${num(s.jumps)}</td>
+      <td>${intelCell(s)}</td>
+      <td>${countCell(s)}</td>
+      <td class="sovcol">${sovCell(s, sovBySys)}</td>
+      <td>${sparkSvg(s)}</td>
+    </tr>`).join("");
+  document.querySelectorAll("#tbl th").forEach(th => th.toggleAttribute("aria-sort", th.dataset.k === k));
+}
+
+function renderFeed() {
+  let list = [...state.kills.values()].filter(k => state.systems.has(k.sys) || state.watch.has(k.sys));
+  if (cfg.hideFriendly) list = list.filter(k => !(state.friends.has(k.alliance) || state.friends.has(k.corp)));
+  if (state.sel) list = list.filter(k => k.sys === state.sel);
+  list.sort((a, b) => b.time - a.time);
+  $("#feedtitle").textContent = state.sel ? `Kills in ${state.systems.get(state.sel).name}, last 24 hours` : "Kills, last 24 hours";
+  if (!list.length) { $("#feed").innerHTML = `<div class="empty">No kills in the last 24 hours${state.sel ? " in this system" : " in range"}.</div>`; return; }
+  $("#feed").innerHTML = list.slice(0, 150).map(k => {
+    const s = state.systems.get(k.sys) || state.watch.get(k.sys);
+    const fresh = Date.now() - k.time < 36e5;
+    const who = [k.victim ? nm(k.victim) : "", nm(k.alliance) || nm(k.corp)].filter(Boolean).join(" · ");
+    return `<div class="kill">
+      <span class="t${fresh ? " fresh" : ""}" title="${new Date(k.time).toISOString().replace("T", " ").slice(0, 16)} EVE">${ago(k.time)}</span>
+      <span class="what">${standingChip(k)}<a href="https://zkillboard.com/kill/${k.id}/" target="_blank" rel="noopener">${esc(nm(k.ship))}</a>
+        in <b>${esc(s.name)}</b>${s.gates?.[k.loc] ? ` on ${esc(nm(s.gates[k.loc]))} gate` : ""}${cfg.showSov && killStruct(k) ? `<span class="chip struct" title="${esc(killStruct(k))}">STRUCTURE</span>` : ""}${killBig(k).map(b => `<span class="chip big">${esc(b)}</span>`).join("")} <span class="who">(${s.dist != null ? s.dist + "j" : "watched"}) ${esc(who)}${k.npc ? " · NPC" : ""} · ${k.attackers} on</span></span>
+      <span class="v">${isk(k.value)}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderSummary() {
+  const S = [...state.systems.values()];
+  const sum = f => S.reduce((a, s) => a + (s[f] || 0), 0);
+  const mapCamps = [...state.camps.keys()].filter(id => state.systems.has(id)).length;
+  const hot = S.filter(s => s.k1).sort((a, b) => b.k1 - a.k1).slice(0, 3).map(s => s.name).join(", ") || "none";
+  $("#summary").innerHTML = `
+    <div>Systems<b>${S.length}</b></div>
+    <div class="hotv">Kills, last hour<b>${sum("k1")}</b></div>
+    <div>Kills, 24 h<b>${sum("k24")}</b></div>
+    <div>Ship jumps, last hour<b>${sum("jumps")}</b></div>
+    <div>Rats killed, last hour<b>${sum("npc_kills")}</b></div>
+    <div>Hot right now<b style="font-size:16px">${esc(hot)}</b></div>
+    <div class="${mapCamps ? "hotv" : ""}">Possible gate camps<b>${mapCamps}</b></div>
+    ${whSummary()}
+    ${sovSummary()}`;
+}
+
+function renderAll() { renderWatch(); computeCounts(); computeCamps(); campAlerts(); sovAlerts(); computeIntel(); renderIntel(); renderSummary(); renderMap(); renderTable(); renderFeed(); }
+
+/* ---------- intel channel (reads EVE chat logs from disk) ---------- */
+const intel = { dir: null, files: new Map(), locals: new Map(), reports: [], poll: null, scan: null, audio: null };
+const ls = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+$("#intelChannels").value = ls.get("intelChannels", "");
+function intelStatus(msg, err) { const s = $("#intelStatus"); s.textContent = msg; s.className = err ? "err" : ""; }
+const channelList = () => $("#intelChannels").value.split(",").map(c => c.trim()).filter(Boolean);
+
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open("intel", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function kvGet(k) { try { const db = await idb(); return await new Promise(res => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch { return null; } }
+async function kvSet(k, v) { try { const db = await idb(); db.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch {} }
+
+function matchSystems(msg) {
+  const out = new Set();
+  const S = [...state.systems.values()];
+  for (const t of msg.toUpperCase().split(/[^A-Z0-9-]+/)) {
+    if (!t) continue;
+    const ex = S.find(s => s.name.toUpperCase() === t);
+    if (ex) { out.add(ex.id); continue; }
+    // intel shorthand (first few letters of a name): unique prefix of a system in range
+    if (t.length >= 3 && /[-0-9]/.test(t)) { const c = S.filter(s => s.name.toUpperCase().startsWith(t)); if (c.length === 1) out.add(c[0].id); }
+  }
+  return [...out];
+}
+const isClear = msg => /\b(clr|clear)\b/i.test(msg);
+// pilot count from intel shorthand: "+5", "5x", "5 nv", "5 reds", "local 12", "x5"
+function parseCount(msg) {
+  if (isClear(msg)) return 0;
+  const pats = [
+    /(?:^|\s)\+\s?(\d{1,3})\b/,
+    /(?:^|\s)(\d{1,3})\s*(?:x|nv|reds?|neuts?|hostiles?|in local|local|ppl|people|pilots?|guys)(?=\s|$|[.,!?*])/i,
+    /(?:^|\s)(?:local|x)\s*:?\s*(\d{1,3})(?=\s|$|[.,!?*])/i
+  ];
+  for (const re of pats) { const m = msg.match(re); if (m) return +m[1]; }
+  return null;
+}
+
+function parseLine(line, f) {
+  const m = line.replace(/^﻿/, "").match(/^\s*\[\s*(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2}):(\d{2})\s*\]\s*(.+?) > (.*)$/);
+  if (!m) return;
+  const t = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]); // EVE time is UTC
+  if (Date.now() - t > 36e5 || m[7] === "EVE System") return;
+  const r = { t, who: m[7], msg: m[8].trim(), ch: f.ch, live: !!f.primed };
+  intel.reports.push(r);
+  if (f.primed) maybeAlert(r);
+}
+
+function parseLocalLine(line, f) {
+  const clean = line.replace(/^﻿/, "");
+  const who = clean.match(/^\s*Listener:\s*(.+?)\s*$/);
+  if (who) { f.listener = who[1]; return; }
+  const m = clean.match(/^\s*\[\s*(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2}):(\d{2})\s*\]\s*EVE System > Channel changed to Local : (.+?)\s*$/);
+  if (m) { f.system = m[7].replace(/\*+$/, "").trim(); f.since = Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]); }
+}
+
+async function scanFiles() {
+  const want = channelList().map(c => c.toLowerCase());
+  const best = new Map(), locals = new Map();
+  for await (const [name, h] of intel.dir.entries()) {
+    if (h.kind !== "file") continue;
+    const m = name.match(/^(.*)_(\d{8})_(\d{6})(?:_(\d+))?\.txt$/i);
+    if (!m) continue;
+    if (m[1].toLowerCase() === "local") {
+      const day = m[2], now = new Date(), y = new Date(now - 864e5);
+      const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, "");
+      if (day !== ymd(now) && day !== ymd(y)) continue; // skip old logs without opening them
+      const file = await h.getFile();
+      if (Date.now() - file.lastModified > 864e5) continue;
+      const key = m[4] || name, cur = locals.get(key);
+      if (!cur || file.lastModified > cur.mod) locals.set(key, { h, name, mod: file.lastModified });
+      continue;
+    }
+    if (!want.includes(m[1].toLowerCase())) continue;
+    const file = await h.getFile();
+    const ch = m[1], cur = best.get(ch.toLowerCase());
+    if (!cur || file.lastModified > cur.mod) best.set(ch.toLowerCase(), { h, name, ch, mod: file.lastModified });
+  }
+  for (const [key, b] of best) {
+    const ex = intel.files.get(key);
+    if (!ex || ex.name !== b.name) intel.files.set(key, { h: b.h, name: b.name, ch: b.ch, offset: 0, carry: "", primed: false });
+  }
+  for (const [key, b] of locals) {
+    const ex = intel.locals.get(key);
+    if (!ex || ex.name !== b.name) intel.locals.set(key, { h: b.h, name: b.name, local: true, offset: 0, carry: "", primed: false });
+  }
+  const missing = want.filter(c => !best.has(c));
+  const found = [...intel.files.values()].map(f => f.ch);
+  if (!want.length) { intelStatus(intel.locals.size ? "Tracking your location only. Add an intel channel name to watch reports." : "No Local chat logs from the last day. Log in, and check that Log Chat to File is on.", !intel.locals.size); return; }
+  intelStatus(found.length
+    ? `Watching ${found.join(", ")}${missing.length ? ` · no log yet for ${missing.join(", ")} (join it in game)` : ""}`
+    : `No chat log found for ${want.join(", ") || "any channel"}. Check the channel name, join it in game, and make sure Log Chat to File is on in EVE's settings.`, !found.length);
+}
+
+async function readNew(f) {
+  const file = await f.h.getFile();
+  if (file.size < f.offset) { f.offset = 0; f.carry = ""; }
+  if (file.size === f.offset) { f.primed = true; return false; }
+  const start = f.offset - (f.offset % 2);
+  const buf = await file.slice(start).arrayBuffer();
+  const usable = buf.byteLength - (buf.byteLength % 2);
+  const text = f.carry + new TextDecoder("utf-16le").decode(new Uint8Array(buf, 0, usable)); // EVE logs are UTF-16LE
+  f.offset = start + usable;
+  const lines = text.split(/\r?\n/); f.carry = lines.pop();
+  lines.forEach(l => (f.local ? parseLocalLine : parseLine)(l, f));
+  f.primed = true;
+  return lines.length > 0;
+}
+
+async function pollIntel() {
+  let changed = false;
+  for (const f of [...intel.files.values(), ...intel.locals.values()]) { try { changed = (await readNew(f)) || changed; } catch (e) { intelStatus("Couldn't read " + f.name + ": " + e.message, true); } }
+  const cut = Date.now() - 36e5;
+  intel.reports = intel.reports.filter(r => r.t >= cut);
+  checkFollow();
+  if (changed) { computeIntel(); renderIntel(); renderMap(); renderTable(); renderWatch(); resolvePilots(); }
+}
+
+function startIntel() {
+  clearInterval(intel.poll); clearInterval(intel.scan);
+  $("#intelReconnect").hidden = true;
+  intel.files = new Map(); intel.locals = new Map(); intel.reports = [];
+  scanFiles().then(pollIntel).catch(e => intelStatus("Couldn't read the folder: " + e.message, true));
+  intel.poll = setInterval(pollIntel, 1500);
+  intel.scan = setInterval(() => scanFiles().catch(() => {}), 30e3); // new log file after relog or downtime
+}
+
+function computeIntel() {
+  for (const s of state.systems.values()) { s.intelAge = null; s.intelClear = false; s.intelCount = null; s.countAge = null; s.here = []; s.bigI = new Set(); s.essI = false; }
+  const now = Date.now();
+  for (const r of [...intel.reports].sort((a, b) => a.t - b.t)) {
+    const clr = isClear(r.msg), ids = matchSystems(r.msg);
+    // a count is only trusted when the message names exactly one system
+    const n = ids.length === 1 ? parseCount(r.msg) : null;
+    for (const id of ids) {
+      const s = state.systems.get(id);
+      s.intelAge = (now - r.t) / 60e3; s.intelClear = clr;
+      if (n != null) { s.intelCount = n; s.countAge = s.intelAge; }
+      if (!clr && now - r.t < 15 * 60e3) { reportBig(r).forEach(b => s.bigI.add(b)); if (isEss(r.msg)) s.essI = true; }
+    }
+  }
+  const byName = new Map([...state.systems.values()].map(s => [s.name.toUpperCase(), s]));
+  for (const f of intel.locals.values()) {
+    const s = f.system && byName.get(f.system.toUpperCase());
+    if (s) s.here.push(f.listener || "you");
+  }
+}
+function countCell(s) {
+  if (s.intelCount == null) return `<span class="zero">–</span>`;
+  const m = Math.floor(s.countAge) + "m";
+  return `<span class="pill ${s.intelCount ? "i" : "c"}" title="Reported ${m} ago">${s.intelCount} · ${m}</span>`;
+}
+function renderYou() {
+  const el = $("#youStatus");
+  const here = [...intel.locals.values()].filter(f => f.system);
+  el.innerHTML = here.map(f => {
+    const s = [...state.systems.values()].find(x => x.name.toUpperCase() === f.system.toUpperCase());
+    const where = s ? `${s.dist} jump${s.dist === 1 ? "" : "s"} from ${esc(state.systems.get(state.origin).name)}` : "outside this map";
+    return `<div>${esc(f.listener || "You")}: <b>${esc(f.system)}</b> · ${where}${cfg.follow ? " · following" : ""}</div>`;
+  }).join("");
+}
+function intelCell(s) {
+  if (s.intelAge == null) return `<span class="zero">–</span>`;
+  const m = Math.floor(s.intelAge) + "m";
+  return s.intelClear ? `<span class="pill c" title="Last report said clear">clr ${m}</span>` : `<span class="pill i">${m}</span>`;
+}
+
+function renderIntel() {
+  if (!intel.dir) return;
+  renderYou();
+  const lim = +cfg.alRange, fromYou = cfg.alFrom === "you" && youNow();
+  const onMap = cfg.intelFilter === "map";
+  const list = [...intel.reports].filter(r => !onMap || matchSystems(r.msg).length || matchWatch(r.msg).length).sort((a, b) => b.t - a.t).slice(0, 60);
+  if (!list.length) { $("#intelFeed").innerHTML = `<div class="empty">${onMap ? "No intel about systems on the map in the last hour." : "No intel messages in the last hour."}</div>`; return; }
+  $("#intelFeed").innerHTML = list.map(r => {
+    const hits = matchSystems(r.msg).map(id => state.systems.get(id));
+    const clr = isClear(r.msg);
+    let html = esc(r.msg);
+    const n = hits.length === 1 ? parseCount(r.msg) : null;
+    const tags = hits.map(s => {
+      const yd = fromYou ? distFromYou(s.id) : null;
+      return `<mark class="${clr ? "clr" : ""}">${esc(s.name)} ${s.dist}j${yd != null && yd !== s.dist ? " · " + yd + "j from you" : ""}${n ? " · " + n + " pilots" : ""}</mark>`;
+    }).join(" ") + matchWatch(r.msg).filter(id => !state.systems.has(id)).map(id => `<mark class="${clr ? "clr" : ""}">${esc(state.watch.get(id).name)} · watched</mark>`).join(" ") + reportBig(r).map(b => `<span class="chip big">${esc(b)}</span>`).join("") + (cfg.showSov && isEss(r.msg) ? `<span class="chip ess">ESS</span>` : "");
+    const near = !clr && hits.some(s => (fromYou ? distFromYou(s.id) ?? s.dist : s.dist) <= Math.max(lim, 1));
+    const pilotsHtml = (r.seg?.pilots || []).map(pilotLine).join("");
+    const fresh = Date.now() - r.t < 5 * 60e3;
+    return `<div class="rep${near ? " near" : ""}"><span class="t${fresh ? " fresh" : ""}">${ago(r.t)}</span>
+      <span class="msg">${tags} ${html} <span class="by">· ${esc(r.who)}${intel.files.size > 1 ? " in " + esc(r.ch) : ""}</span>${pilotsHtml ? `<div class="pilots">${pilotsHtml}</div>` : ""}</span></div>`;
+  }).join("");
+}
+
+async function intelReady() {
+  // after the neighbourhood loads, reuse a folder picked on a previous visit
+  if (intel.dir || !window.showDirectoryPicker) return;
+  const h = await kvGet("dir"); if (!h) return;
+  try {
+    if (await h.queryPermission({ mode: "read" }) === "granted") { intel.dir = h; startIntel(); }
+    else { intel.pending = h; $("#intelReconnect").hidden = false; intelStatus("Press Reconnect folder to resume watching your intel channel."); }
+  } catch {}
+}
+// the system your most recently active character was last in, from the Local chat logs
+async function lastLocation(dir) {
+  const ymd = d => d.toISOString().slice(0, 10).replace(/-/g, "");
+  const days = [ymd(new Date()), ymd(new Date(Date.now() - 864e5)), ymd(new Date(Date.now() - 2 * 864e5))];
+  let best = null;
+  for await (const [name, h] of dir.entries()) {
+    const m = h.kind === "file" && name.match(/^Local_(\d{8})_\d{6}(?:_\d+)?\.txt$/i);
+    if (!m || !days.includes(m[1])) continue;
+    const file = await h.getFile();
+    if (!best || file.lastModified > best.file.lastModified) best = { file };
+  }
+  if (!best) return null;
+  const buf = await best.file.arrayBuffer();
+  const f = {};
+  new TextDecoder("utf-16le").decode(new Uint8Array(buf, 0, buf.byteLength - (buf.byteLength % 2))).split(/\r?\n/).forEach(l => parseLocalLine(l, f));
+  return f.system ? f.system.toUpperCase() : null;
+}
+// start in your current system unless the link named one
+async function followLocation() {
+  if (state.pinned || !intel.dir) return false;
+  let sys = null;
+  try { sys = await lastLocation(intel.dir); } catch {}
+  if (!sys) return false;
+  const cur = state.origin && state.systems.get(state.origin);
+  if (cur && cur.name.toUpperCase() === sys) return true;
+  $("#origin").value = sys;
+  ls.set("origin", sys);
+  start(sys, +$("#radius").value);
+  return true;
+}
+function unlockAudio() { try { intel.audio ||= new (window.AudioContext || window.webkitAudioContext)(); intel.audio.resume(); } catch {} }
+
+$("#intelConnect").addEventListener("click", async () => {
+  unlockAudio();
+  if (!window.showDirectoryPicker) { intelStatus("Reading chat logs needs Chrome or Edge on desktop. This browser can't watch local files.", true); return; }
+  ls.set("intelChannels", $("#intelChannels").value);
+  if (intel.dir) { startIntel(); return; }
+  try {
+    const h = await showDirectoryPicker({ id: "evechatlogs", mode: "read" });
+    intel.dir = h; await kvSet("dir", h); startIntel(); followLocation();
+  } catch (e) { if (e.name !== "AbortError") intelStatus("Couldn't open the folder: " + e.message, true); }
+});
+$("#intelReconnect").addEventListener("click", async () => {
+  unlockAudio();
+  const h = intel.pending; if (!h) return;
+  if (await h.requestPermission({ mode: "read" }) === "granted") { intel.dir = h; startIntel(); followLocation(); }
+});
+$("#intelChannels").addEventListener("change", () => { ls.set("intelChannels", $("#intelChannels").value); if (intel.dir) startIntel(); });
+
+/* ---------- settings ---------- */
+const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
+let cfg;
+try { cfg = { ...SETTINGS_DEFAULT, ...JSON.parse(ls.get("settings", "{}")) }; } catch { cfg = { ...SETTINGS_DEFAULT }; }
+if (ls.get("settings", null) == null && ls.get("intelAlert", null) != null) cfg.alRange = ls.get("intelAlert"); // older version's setting
+const saveCfg = () => ls.set("settings", JSON.stringify(cfg));
+for (const k of Object.keys(SETTINGS_DEFAULT)) {
+  const el = document.getElementById(k); if (!el) continue;
+  if (el.type === "checkbox") el.checked = !!cfg[k]; else el.value = cfg[k];
+  el.addEventListener("change", () => { cfg[k] = el.type === "checkbox" ? el.checked : el.value.trim(); saveCfg(); onSetting(k); });
+}
+function onSetting(k) {
+  unlockAudio();
+  if (k === "alDesktop" && cfg.alDesktop) enableDesktop();
+  if (k === "follow") { checkFollow(); renderIntel(); }
+  if (k === "showWh") loadWormholes().then(renderAll);
+  if (k === "friends" || k === "enemies") resolveStandings().then(renderAll);
+  if (k === "hideFriendly") renderFeed();
+  if (k === "showRats") { $("#ratLegend").hidden = !cfg.showRats; renderMap(); }
+  if (k === "watch") loadWatch();
+  if (k === "showSov") { $("#sovLegend").hidden = !cfg.showSov; loadSov().then(renderAll); }
+  if (k === "alRange" || k === "alFrom" || k === "intelFilter") renderIntel();
+}
+async function enableDesktop() {
+  const note = $("#alNote");
+  const off = msg => { cfg.alDesktop = false; $("#alDesktop").checked = false; saveCfg(); note.textContent = msg; note.className = "note err"; };
+  if (!("Notification" in window)) return off("This browser doesn't support desktop pop-ups.");
+  let p = Notification.permission;
+  if (p === "default") { try { p = await Notification.requestPermission(); } catch { p = "denied"; } }
+  if (p !== "granted") return off("The browser blocked pop-ups for this page. Chrome often blocks them for files opened from your disk; putting the page on a website (for example GitHub Pages) fixes that.");
+  note.textContent = "Desktop pop-ups are on."; note.className = "note";
+}
+$("#alTest").addEventListener("click", () => { unlockAudio(); fireAlert("test" + Date.now(), "Test alert", "This is how alerts will look.", "Test alert", true); });
+
+/* ---------- alerts: sound, desktop pop-up, speech, flashing tab ---------- */
+const alerted = new Set();
+let flashTimer = null;
+const say = n => /[-0-9]/.test(n) ? n.replace(/-/g, " ").split("").join(" ") : n; // spell out names like C-J6MT
+const fromYouTxt = () => cfg.alFrom === "you" && youNow() ? " from you" : "";
+function beep() {
+  if (!intel.audio) return;
+  const a = intel.audio, o = a.createOscillator(), g = a.createGain();
+  o.type = "square"; o.frequency.value = 880; g.gain.value = 0.08;
+  o.connect(g); g.connect(a.destination); o.start();
+  o.frequency.setValueAtTime(660, a.currentTime + 0.12); o.stop(a.currentTime + 0.3);
+}
+function fireAlert(key, title, body, speech, force) {
+  if (alerted.has(key)) return; alerted.add(key);
+  if (cfg.alSound) beep();
+  if (cfg.alDesktop && "Notification" in window && Notification.permission === "granted") {
+    try { const n = new Notification(title, { body, tag: key }); n.onclick = () => { window.focus(); n.close(); }; } catch {}
+  }
+  if (cfg.alSpeak && "speechSynthesis" in window) { try { speechSynthesis.speak(new SpeechSynthesisUtterance(speech || title)); } catch {} }
+  if (document.hidden || force) flashTitle(title);
+}
+function flashTitle(msg) {
+  clearInterval(flashTimer);
+  const base = state.baseTitle || "Local Intel"; let on = false, n = 0;
+  flashTimer = setInterval(() => {
+    document.title = (on = !on) ? "(!) " + msg : base;
+    if (!document.hidden && ++n > 6) { clearInterval(flashTimer); flashTimer = null; document.title = base; }
+  }, 1000);
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && flashTimer) { clearInterval(flashTimer); flashTimer = null; document.title = state.baseTitle || "Local Intel"; }
+});
+
+async function maybeAlert(r) {
+  if (isClear(r.msg)) return;
+  const wHits = matchWatch(r.msg);
+  if (wHits.length && cfg.alWatch) {
+    const w = state.watch.get(wHits[0]), n0 = wHits.length === 1 ? parseCount(r.msg) : null;
+    return fireAlert("i" + r.t + r.msg, `Hostile in watched system ${w.name}${n0 ? ", " + n0 + " pilots" : ""}`, `${r.who}: ${r.msg}`, `Watched system, ${say(w.name)}${n0 ? ", " + n0 + " pilots" : ""}`);
+  }
+  const ids = matchSystems(r.msg); if (!ids.length) return;
+  const n = ids.length === 1 ? parseCount(r.msg) : null;
+  const big = reportBig(r);
+  if (big.length && cfg.alBig) {
+    const s0 = state.systems.get(ids[0]);
+    return fireAlert("b" + r.t + r.msg, `${big.join(", ")} reported in ${s0.name}`, `${r.who}: ${r.msg}`, `${big.join(", ")}, ${say(s0.name)}`);
+  }
+  const range = +cfg.alRange; if (range < 0) return;
+  let best = null;
+  for (const id of ids) { const d = await alertDistAsync(id); if (d != null && (!best || d < best.d)) best = { id, d }; }
+  if (!best || best.d > range) return;
+  const s = state.systems.get(best.id), where = `${best.d} jump${best.d === 1 ? "" : "s"}${fromYouTxt()}`;
+  if (isEss(r.msg) && cfg.showSov && cfg.alSov)
+    return fireAlert("i" + r.t + r.msg, `ESS activity ${where}: ${s.name}`, `${r.who}: ${r.msg}`, `E S S activity, ${best.d} jump${best.d === 1 ? "" : "s"}, ${say(s.name)}`);
+  fireAlert("i" + r.t + r.msg, `Hostile ${where}: ${s.name}${n ? ", " + n + " pilots" : ""}`, `${r.who}: ${r.msg}`,
+    `Hostile, ${best.d} jump${best.d === 1 ? "" : "s"}, ${say(s.name)}${n ? ", " + n + " pilots" : ""}`);
+}
+
+function killAlerts(added, primed, wPrimed) {
+  const now = Date.now();
+  for (const k of added) {
+    if (now - k.time > 15 * 60e3) continue;
+    const w = state.watch.get(k.sys);
+    if (w && cfg.alWatch && wPrimed.has(k.sys)) {
+      const owner = nm(k.alliance) || nm(k.corp);
+      fireAlert("k" + k.id, `Kill in watched system ${w.name}`, `${nm(k.ship)} destroyed${owner ? " (" + owner + ")" : ""}`, `Kill, watched system, ${say(w.name)}`);
+      continue;
+    }
+    const s = state.systems.get(k.sys);
+    if (!s || !primed) continue;
+    const st = killStruct(k);
+    if (st && cfg.showSov && cfg.alSov) { fireAlert("ks" + k.id, `Structure destroyed in ${s.name}`, `${nm(k.ship)}${k.alliance || k.corp ? " owned by " + (nm(k.alliance) || nm(k.corp)) : ""}`, `Structure destroyed, ${say(s.name)}`); continue; }
+    const big = killBig(k);
+    if (big.length && cfg.alBig) { fireAlert("kb" + k.id, `${big.join(", ")} on a killmail in ${s.name}`, `${nm(k.ship)} destroyed in ${s.name}`, `${big.join(", ")}, ${say(s.name)}`); continue; }
+    if (!cfg.alKills || +cfg.alRange < 0) continue;
+    const d = alertDist(k.sys); if (d == null || d > +cfg.alRange) continue;
+    const owner = nm(k.alliance) || nm(k.corp);
+    fireAlert("k" + k.id, `Kill ${d} jump${d === 1 ? "" : "s"}${fromYouTxt()}: ${s.name}`, `${nm(k.ship)} destroyed${owner ? " (" + owner + ")" : ""}`, `Kill, ${d} jumps, ${say(s.name)}`);
+  }
+}
+function campAlerts() {
+  const keys = new Set([...state.camps.values()].map(c => c.sys + ":" + c.gate));
+  // the first look at a freshly loaded map only records camps that already exist
+  const firstLook = state.campPrimedFor !== state.systems;
+  if (state.primedFor === state.systems) state.campPrimedFor = state.systems;
+  if (state.primedFor === state.systems && !firstLook) {
+    for (const c of state.camps.values()) {
+      const key = c.sys + ":" + c.gate; if (state.campKeys.has(key)) continue;
+      const w = state.watch.get(c.sys);
+      if (w && !state.watchPrimedPrev?.has(c.sys)) continue; // just added to the watchlist: the camp was already there
+      if (w && cfg.alWatch) { fireAlert("c" + key + ":" + Math.floor(c.first / 18e5), `Possible gate camp in watched system ${w.name}`, `${c.n} kills on the ${nm(c.dest)} gate in 30 minutes`, `Gate camp, watched system, ${say(w.name)}`); continue; }
+      if (!cfg.alKills || +cfg.alRange < 0 || !state.systems.has(c.sys)) continue;
+      const d = alertDist(c.sys); if (d == null || d > +cfg.alRange) continue;
+      const s = state.systems.get(c.sys);
+      fireAlert("c" + key + ":" + Math.floor(c.first / 18e5), `Possible gate camp ${d} jump${d === 1 ? "" : "s"}${fromYouTxt()}: ${s.name}`, `${c.n} kills on the ${nm(c.dest)} gate in 30 minutes`, `Gate camp, ${say(s.name)}, ${say(nm(c.dest))} gate`);
+    }
+  }
+  state.campKeys = keys;
+}
+
+/* ---------- where you are, and jumps from you ---------- */
+function youNow() {
+  let best = null;
+  for (const f of intel.locals.values()) if (f.system && (!best || (f.since || 0) > (best.since || 0))) best = f;
+  return best;
+}
+const bfsMemo = { key: null, d: null };
+function bfsFrom(id) {
+  const d = new Map([[id, 0]]), q = [id];
+  while (q.length) { const c = q.shift(); for (const n of state.systems.get(c).neighbors) if (state.systems.has(n) && !d.has(n)) { d.set(n, d.get(c) + 1); q.push(n); } }
+  return d;
+}
+const routeP = new Map(), routeV = new Map(), sysIdCache = new Map();
+function routeTo(fromName, toId) {
+  const k = fromName.toUpperCase() + ">" + toId;
+  if (!routeP.has(k)) routeP.set(k, (async () => {
+    let fromId = sysIdCache.get(fromName.toUpperCase());
+    if (!fromId) { const r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON([fromName])); fromId = r.systems?.[0]?.id; if (fromId) sysIdCache.set(fromName.toUpperCase(), fromId); }
+    if (!fromId) { routeV.set(k, null); return null; }
+    const route = await getJSON(`${ESI}/route/${fromId}/${toId}/?${DS}`);
+    routeV.set(k, route.length - 1); return route.length - 1;
+  })().catch(() => { routeV.set(k, null); return null; }));
+  return { k, p: routeP.get(k) };
+}
+function distFromYou(toId) {
+  const me = youNow(); if (!me) return null;
+  const meSys = [...state.systems.values()].find(s => s.name.toUpperCase() === me.system.toUpperCase());
+  if (meSys && state.systems.has(toId)) {
+    const key = meSys.id + ":" + state.gen;
+    if (bfsMemo.key !== key) { bfsMemo.key = key; bfsMemo.d = bfsFrom(meSys.id); }
+    return bfsMemo.d.get(toId) ?? null;
+  }
+  const { k, p } = routeTo(me.system, toId);
+  if (routeV.has(k)) return routeV.get(k);
+  p.then(() => { renderIntel(); renderWatch(); });
+  return null;
+}
+function alertDist(id) { return cfg.alFrom === "you" && youNow() ? distFromYou(id) : state.systems.get(id)?.dist ?? null; }
+async function alertDistAsync(id) {
+  const me = youNow();
+  if (cfg.alFrom !== "you" || !me) return state.systems.get(id)?.dist ?? null;
+  const v = distFromYou(id); if (v != null) return v;
+  if ([...state.systems.values()].some(s => s.name.toUpperCase() === me.system.toUpperCase())) return null;
+  return await routeTo(me.system, id).p;
+}
+function checkFollow() {
+  if (!cfg.follow) return;
+  const me = youNow(); if (!me) return;
+  const name = me.system.toUpperCase();
+  if (state.target === name) return;
+  $("#origin").value = name; ls.set("origin", name);
+  start(name, +$("#radius").value);
+}
+
+/* ---------- big ships ---------- */
+const BIG = { 30: "Titan", 659: "Supercarrier", 485: "Dreadnought", 4594: "Lancer", 547: "Carrier", 1538: "FAX", 883: "Rorqual", 541: "Dictor", 894: "HIC", 898: "Black Ops" };
+const BIG_WORDS = [[/\btitans?\b/i, "Titan"], [/\bsupers?\b|\bsupercarriers?\b/i, "Supercarrier"], [/\bdreads?\b|\bdreadnoughts?\b/i, "Dreadnought"],
+  [/\blancers?\b/i, "Lancer"], [/\bcarriers?\b/i, "Carrier"], [/\bfax\b/i, "FAX"], [/\brorq(ual)?s?\b/i, "Rorqual"], [/\b(inter)?dictors?\b/i, "Dictor"],
+  [/\bhics?\b|\bheavy interdictors?\b/i, "HIC"], [/\bblops\b|\bblack ?ops\b/i, "Black Ops"], [/\bcaps\b|\bcapitals?\b/i, "Capital"], [/\bcynos?\b/i, "Cyno"]];
+let typeGroup = {};
+try { typeGroup = JSON.parse(ls.get("typeGroups", "{}")) || {}; } catch {}
+async function loadGroups(typeIds) {
+  const need = [...new Set(typeIds.filter(t => t && typeGroup[t] == null))];
+  if (!need.length) return;
+  await pool(need, 8, async t => { try { typeGroup[t] = (await getJSON(`${ESI}/universe/types/${t}/?${DS}`)).group_id; } catch {} });
+  ls.set("typeGroups", JSON.stringify(typeGroup));
+}
+function killBig(k) {
+  const out = new Set();
+  for (const t of [k.ship, ...(k.atkShips || [])]) { const l = BIG[typeGroup[t]]; if (l) out.add(l); }
+  return [...out];
+}
+function reportBig(r) {
+  const out = new Set();
+  for (const [re, l] of BIG_WORDS) if (re.test(r.msg)) out.add(l);
+  for (const t of r.seg?.ships || []) { const l = BIG[typeGroup[t]]; if (l) out.add(l); }
+  return [...out];
+}
+const bigTags = s => [...new Set([...(s.bigK || []), ...(s.bigI || [])])];
+
+/* ---------- gate camps: 2+ kills on the same gate within 30 minutes ---------- */
+function computeCamps() {
+  const now = Date.now(), W = 30 * 60e3, by = new Map();
+  for (const k of state.kills.values()) {
+    if (now - k.time > W || !k.loc || k.npc) continue;
+    const s = state.systems.get(k.sys) || state.watch.get(k.sys); if (!s?.gates || s.gates[k.loc] == null) continue;
+    const key = k.sys + ":" + k.loc;
+    const g = by.get(key) || { sys: k.sys, gate: k.loc, dest: s.gates[k.loc], n: 0, pods: 0, first: k.time, last: 0 };
+    g.n++; if (typeGroup[k.ship] === 29) g.pods++;
+    g.first = Math.min(g.first, k.time); g.last = Math.max(g.last, k.time);
+    by.set(key, g);
+  }
+  state.camps = new Map();
+  for (const g of by.values()) if (g.n >= 2) { const cur = state.camps.get(g.sys); if (!cur || g.n > cur.n) state.camps.set(g.sys, g); }
+}
+
+/* ---------- Thera and Turnur (EVE-Scout) ---------- */
+async function loadWormholes() {
+  const note = $("#whNote");
+  if (!cfg.showWh) { state.wh = []; note.textContent = ""; return; }
+  try {
+    const list = await getJSON("https://api.eve-scout.com/v2/public/signatures", {}, 2);
+    state.wh = Array.isArray(list) ? list : [];
+    note.textContent = `${state.wh.length} Thera and Turnur connections known. Updated ${new Date().toLocaleTimeString()}.`; note.className = "note";
+  } catch { note.textContent = "Couldn't reach EVE-Scout for wormhole connections."; note.className = "note err"; }
+}
+function whMap() {
+  const m = new Map();
+  for (const w of state.wh) if (state.systems.has(w.in_system_id)) (m.get(w.in_system_id) || m.set(w.in_system_id, []).get(w.in_system_id)).push(w);
+  return m;
+}
+function whSummary() {
+  if (!cfg.showWh) return "";
+  const list = [...whMap().values()].flat().sort((a, b) => state.systems.get(a.in_system_id).dist - state.systems.get(b.in_system_id).dist);
+  if (!list.length) return `<div class="whs">Thera / Turnur: no connections in range</div>`;
+  return `<div class="whs">Thera / Turnur: ${list.map(w => {
+    const s = state.systems.get(w.in_system_id);
+    const hrs = w.remaining_hours != null ? `, ${w.remaining_hours}h left` : "";
+    return `<b>${esc(s.name)}</b> (${esc(w.out_system_name)}, ${s.dist}j${w.max_ship_size ? ", " + esc(w.max_ship_size) : ""}${hrs})`;
+  }).join(" · ")}</div>`;
+}
+
+/* ---------- table extras ---------- */
+function sysChips(s, whBySys) {
+  let h = "";
+  const c = state.camps.get(s.id);
+  if (attackedSystems().has(s.id)) h += `<span class="chip camp" title="A character's notification reported an attack here in the last hour">ATTACKED</span>`;
+  if (c) h += `<span class="chip camp" title="${esc(`${c.n} kills on the ${nm(c.dest)} gate in the last 30 minutes${c.pods ? ", " + c.pods + " pods" : ""}`)}">CAMP</span>`;
+  const big = bigTags(s);
+  if (big.length) h += `<span class="chip big" title="${esc(big.join(", "))} in the last hour">${esc(big[0].toUpperCase())}${big.length > 1 ? "+" + (big.length - 1) : ""}</span>`;
+  for (const w of whBySys.get(s.id) || []) h += `<span class="chip wh" title="${esc(`${w.out_system_name} connection${w.max_ship_size ? ", " + w.max_ship_size : ""}${w.remaining_hours != null ? ", " + w.remaining_hours + "h left" : ""}`)}">${w.out_system_name === "Thera" ? "TH" : "TU"}</span>`;
+  return h;
+}
+let jumpHist = {};
+try { jumpHist = JSON.parse(ls.get("jumpHist", "{}")) || {}; } catch {}
+function sparkSvg(s) {
+  const now = Date.now(), bins = Array(24).fill(0);
+  for (const k of state.kills.values()) if (k.sys === s.id) { const h = Math.floor((now - k.time) / 36e5); if (h >= 0 && h < 24) bins[23 - h]++; }
+  const max = Math.max(1, ...bins), W = 72, H = 16, bw = 3;
+  const bars = bins.map((v, i) => {
+    const bh = v ? Math.max(2, v / max * (H - 1)) : 0;
+    return `<rect class="base" x="${i * bw}" y="${H - 1}" width="${bw - 1}" height="1"/>` + (v ? `<rect x="${i * bw}" y="${(H - 1 - bh).toFixed(1)}" width="${bw - 1}" height="${bh.toFixed(1)}"/>` : "");
+  }).join("");
+  const hist = jumpHist[s.id] || {}, hk = Math.floor(now / 36e5), pts = [];
+  const vals = Object.values(hist), maxJ = Math.max(1, ...vals);
+  for (let i = 0; i < 24; i++) { const v = hist[hk - (23 - i)]; if (v != null) pts.push(`${i * bw + 1},${(H - 2 - v / maxJ * (H - 3)).toFixed(1)}`); }
+  const total = bins.reduce((a, b) => a + b, 0);
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${total} kills in 24 hours"><title>${total} kills in 24 h, by hour (left is 24 h ago)${pts.length > 1 ? ". Blue line: ship jumps per hour, sampled while this page was open" : ""}</title>${bars}${pts.length > 1 ? `<polyline points="${pts.join(" ")}"/>` : ""}</svg>`;
+}
+
+/* ---------- standings ---------- */
+async function resolveStandings() {
+  const note = $("#standNote");
+  const split = v => (v || "").split(",").map(x => x.trim()).filter(Boolean);
+  const f = split(cfg.friends), e = split(cfg.enemies);
+  if (!f.length && !e.length) { state.friends = new Set(); state.enemies = new Set(); note.textContent = "Use full names, not tickers."; note.className = "note"; return; }
+  try {
+    const r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON([...f, ...e]));
+    const byName = new Map([...(r.alliances || []), ...(r.corporations || [])].map(x => [x.name.toLowerCase(), x.id]));
+    const miss = [];
+    const ids = list => new Set(list.map(n => { const id = byName.get(n.toLowerCase()); if (!id) miss.push(n); return id; }).filter(Boolean));
+    state.friends = ids(f); state.enemies = ids(e);
+    note.textContent = miss.length ? `Not found: ${miss.join(", ")}. Use the full alliance or corp name, not the ticker.` : `${state.friends.size} friendly, ${state.enemies.size} hostile.`;
+    note.className = "note" + (miss.length ? " err" : "");
+  } catch { note.textContent = "Couldn't look up those names right now."; note.className = "note err"; }
+}
+function standingChip(k) {
+  const fr = state.friends, en = state.enemies;
+  if (fr.has(k.alliance) || fr.has(k.corp)) return `<span class="chip loss" style="margin:0 6px 0 0">LOSS</span>`;
+  if (k.atk?.some(id => fr.has(id))) return `<span class="chip win" style="margin:0 6px 0 0">KILL</span>`;
+  if (en.has(k.alliance) || en.has(k.corp)) return `<span class="chip win" style="margin:0 6px 0 0">HOSTILE DOWN</span>`;
+  return "";
+}
+
+/* ---------- hostile lookup: pilot names in intel ---------- */
+const pil = { names: new Map(), info: new Map(), busy: false, again: false };
+const STOP = new Set(("nv clr clear red reds neut neuts hostile hostiles gate gates gang fleet camp camping local in on at to the and or x is are " +
+  "cloaky cloaked cyno dock docked status jump jumps jumped bubble bubbled ess rat ratting tower citadel pos from going inbound outbound towards " +
+  "with no visual spike incoming ping off stargate station fc you me guys lol ty thanks np gone left still now just up down here there " +
+  "probes probe scanning scan dscan d-scan bombers bomber gang ships ship sabre dictor hic").split(" "));
+function tokens(msg) { return msg.split(/\s+/).map(t => t.replace(/^[*.,!?:;()"\[\]]+|[*.,!?:;()"\[\]]+$/g, "")).filter(Boolean); }
+function runs(msg) {
+  const out = []; let cur = [];
+  for (const t of tokens(msg)) {
+    const brk = STOP.has(t.toLowerCase()) || /^[+x]?\d+x?$/i.test(t) || t.length > 37 || matchSystems(t).length > 0 || matchWatch(t).length > 0;
+    if (brk) { if (cur.length) out.push(cur); cur = []; } else cur.push(t);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+function candidates(msg) {
+  const c = new Set();
+  for (const r of runs(msg)) for (let i = 0; i < r.length; i++) for (let L = 1; L <= 3 && i + L <= r.length; L++) {
+    const v = r.slice(i, i + L).join(" "); if (v.length >= 3 && v.length <= 37) c.add(v);
+  }
+  // ship names are in the stop list for name-splitting but still worth recognising
+  for (const t of tokens(msg)) if (t.length >= 3) c.add(t);
+  return [...c];
+}
+function segment(msg) {
+  const pilots = [], ships = [];
+  for (const t of tokens(msg)) { const v = pil.names.get(t.toLowerCase()); if (v?.kind === "type") ships.push(v.id); }
+  for (const r of runs(msg)) {
+    let i = 0;
+    while (i < r.length) {
+      let hit = null, L;
+      for (L = Math.min(3, r.length - i); L >= 1; L--) { const v = pil.names.get(r.slice(i, i + L).join(" ").toLowerCase()); if (v) { hit = v; break; } }
+      if (hit) { (hit.kind === "char" ? pilots : ships).push(hit.id); i += L; } else i++;
+    }
+  }
+  return { pilots: [...new Set(pilots)], ships: [...new Set(ships)] };
+}
+async function resolvePilots() {
+  if (pil.busy) { pil.again = true; return; }
+  pil.busy = true;
+  try {
+    const want = new Set();
+    for (const r of intel.reports) for (const c of candidates(r.msg)) if (!pil.names.has(c.toLowerCase())) want.add(c);
+    const list = [...want];
+    for (let i = 0; i < list.length; i += 400) {
+      const chunk = list.slice(i, i + 400);
+      let res;
+      try { res = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON(chunk), 2); } catch { continue; }
+      chunk.forEach(c => pil.names.set(c.toLowerCase(), null));
+      (res.characters || []).forEach(x => { pil.names.set(x.name.toLowerCase(), { kind: "char", id: x.id }); state.names.set(x.id, x.name); });
+      (res.inventory_types || []).forEach(x => pil.names.set(x.name.toLowerCase(), { kind: "type", id: x.id }));
+    }
+    const ids = new Set(), types = new Set();
+    for (const r of intel.reports) { r.seg = segment(r.msg); r.seg.pilots.forEach(id => ids.add(id)); r.seg.ships.forEach(t => types.add(t)); }
+    await loadGroups([...types]);
+    const need = [...ids].filter(id => !pil.info.has(id));
+    await pool(need, 2, async id => {
+      const info = { id };
+      try { const c = await getJSON(`${ESI}/characters/${id}/?${DS}`); info.corp = c.corporation_id; info.alliance = c.alliance_id; } catch {}
+      try {
+        const z = await getJSON(`${ZKB}/stats/characterID/${id}/`, { headers: { "Accept": "application/json" } });
+        if (z && typeof z === "object") {
+          info.danger = z.dangerRatio; info.gang = z.gangRatio; info.kills = z.shipsDestroyed || 0; info.losses = z.shipsLost || 0;
+          const tl = (z.topLists || []).find(t => t.type === "shipType");
+          info.ships = (tl?.values || []).slice(0, 3).map(v => v.shipName).filter(Boolean);
+          const g = z.groups || {};
+          const killsIn = list => list.reduce((a, i) => a + (g[i]?.shipsDestroyed || 0), 0);
+          const lostIn = list => list.reduce((a, i) => a + (g[i]?.shipsLost || 0), 0);
+          info.cloaky = killsIn([830, 833, 834, 898]) >= 5;          // kills in covert ops, recons, bombers, Black Ops
+          info.cyno = info.kills < 10 && lostIn([830, 833, 898]) >= 1; // few kills, lost cyno-capable cloaky hulls
+          info.zkb = true;
+        }
+      } catch {}
+      pil.info.set(id, info);
+    });
+    await resolveNames([...pil.info.values()].flatMap(i => [i.corp, i.alliance]));
+    // ship names (e.g. "Sabre") only become known now; alert for live reports that turned out to mention big ships
+    for (const r of intel.reports) if (r.live && Date.now() - r.t < 5 * 60e3 && cfg.alBig && !isClear(r.msg)) {
+      const big = reportBig(r), sysIds = matchSystems(r.msg);
+      if (big.length && sysIds.length) { const s0 = state.systems.get(sysIds[0]); fireAlert("b" + r.t + r.msg, `${big.join(", ")} reported in ${s0.name}`, `${r.who}: ${r.msg}`, `${big.join(", ")}, ${say(s0.name)}`); }
+    }
+  } finally { pil.busy = false; }
+  computeIntel(); renderIntel(); renderMap(); renderTable();
+  if (pil.again) { pil.again = false; resolvePilots(); }
+}
+function pilotLine(id) {
+  const i = pil.info.get(id), link = `<a href="https://zkillboard.com/character/${id}/" target="_blank" rel="noopener">${esc(nm(id))}</a>`;
+  if (!i) return `<div>${link} · looking up…</div>`;
+  const org = [i.corp ? nm(i.corp) : "", i.alliance ? nm(i.alliance) : ""].filter(Boolean).join(" · ");
+  const fr = state.friends, en = state.enemies;
+  const st = fr.has(i.alliance) || fr.has(i.corp) ? `<span class="chip blue">FRIENDLY</span>` : en.has(i.alliance) || en.has(i.corp) ? `<span class="chip red">HOSTILE</span>` : "";
+  const stats = i.zkb ? `danger ${i.danger ?? 0}% · solo ${100 - (i.gang ?? 100)}% · ${i.kills} kills` : "no zKillboard history";
+  const flags = (i.cloaky ? `<span class="chip flag">CLOAKY HUNTER?</span>` : "") + (i.cyno ? `<span class="chip flag">CYNO ALT?</span>` : "");
+  return `<div>${link}${st}${org ? " · " + esc(org) : ""} · ${stats}${i.ships?.length ? " · flies " + esc(i.ships.join(", ")) : ""}${flags}</div>`;
+}
+resolveStandings();
+$("#ratLegend").hidden = !cfg.showRats;
+
+/* ---------- sovereignty, sov fights, structure kills, ESS mentions ---------- */
+state.sovStructs = []; state.campaigns = []; state.sovPrimed = false;
+async function loadSov() {
+  if (!cfg.showSov) { state.sovStructs = []; state.campaigns = []; return; }
+  const [st, ca] = await Promise.all([
+    getJSON(`${ESI}/sovereignty/structures/?${DS}`).catch(() => null),
+    getJSON(`${ESI}/sovereignty/campaigns/?${DS}`).catch(() => null)
+  ]);
+  if (Array.isArray(st)) state.sovStructs = st;
+  if (Array.isArray(ca)) state.campaigns = ca;
+  const near = x => state.systems.has(x.solar_system_id) || state.watch.has(x.solar_system_id);
+  await resolveNames([...state.sovStructs.filter(near).flatMap(x => [x.alliance_id, x.structure_type_id]), ...state.campaigns.filter(near).map(c => c.defender_id)]);
+}
+const dur = ms => {
+  const m = Math.max(0, Math.round(ms / 60e3)), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  return d ? `${d}d ${h % 24}h` : h ? `${h}h ${m % 60}m` : `${m}m`;
+};
+function sovMap() {
+  const m = new Map(), now = Date.now();
+  if (!cfg.showSov) return m;
+  for (const x of state.sovStructs) {
+    if (!state.systems.has(x.solar_system_id)) continue;
+    const e = m.get(x.solar_system_id) || m.set(x.solar_system_id, { adm: 0, vuln: null, next: null, list: [] }).get(x.solar_system_id);
+    e.list.push(x);
+    e.adm = Math.max(e.adm, x.vulnerability_occupancy_level || 0);
+    const a = Date.parse(x.vulnerable_start_time), b = Date.parse(x.vulnerable_end_time);
+    if (a <= now && now < b) e.vuln = Math.max(e.vuln || 0, b);
+    else if (a > now) e.next = Math.min(e.next ?? Infinity, a);
+  }
+  return m;
+}
+const EVENT = { tcu_defense: "TCU", ihub_defense: "IHub", station_defense: "Station", station_freeport: "Freeport" };
+const eventName = c => EVENT[c.event_type] || (c.event_type || "Sov").replace(/_/g, " ");
+function fightMap() {
+  const m = new Map();
+  if (!cfg.showSov) return m;
+  for (const c of state.campaigns) if (state.systems.has(c.solar_system_id)) m.set(c.solar_system_id, c);
+  return m;
+}
+function sovCell(s, sovBySys) {
+  const e = sovBySys.get(s.id), now = Date.now();
+  const c = cfg.showSov && state.campaigns.find(x => x.solar_system_id === s.id);
+  let h = "";
+  if (e) {
+    const tip = e.list.map(x => `${nm(x.structure_type_id)} · ${nm(x.alliance_id)} · ADM ${(x.vulnerability_occupancy_level || 0).toFixed(1)}` +
+      (x.vulnerable_start_time ? ` · vulnerable ${new Date(x.vulnerable_start_time).toISOString().slice(11, 16)}–${new Date(x.vulnerable_end_time).toISOString().slice(11, 16)} EVE` : "")).join("\n");
+    h += `<span title="${esc(tip)}">${e.adm ? e.adm.toFixed(1) : "–"}</span>`;
+    if (e.vuln) h += `<span class="chip sov" title="Vulnerable now, window closes in ${dur(e.vuln - now)}">VULN ${dur(e.vuln - now)}</span>`;
+    else if (e.next && e.next - now < 864e5) h += `<span class="chip" style="color:var(--muted)" title="Next vulnerability window">in ${dur(e.next - now)}</span>`;
+  } else h += `<span class="zero">–</span>`;
+  if (c) {
+    const st = Date.parse(c.start_time), live = st <= now;
+    const score = live && c.defender_score != null ? ` · defender ${Math.round(c.defender_score * 100)}% / attackers ${Math.round((c.attackers_score || 0) * 100)}%` : "";
+    h += `<span class="chip sov" title="${esc(`${eventName(c)} fight, defender ${nm(c.defender_id)}, ${live ? "started" : "starts"} ${new Date(st).toISOString().slice(0, 16).replace("T", " ")} EVE${score}`)}">FIGHT ${live ? "LIVE" : dur(st - now)}</span>`;
+  }
+  return h;
+}
+function sovSummary() {
+  if (!cfg.showSov) return "";
+  const now = Date.now();
+  const list = [...fightMap().values()].sort((a, b) => Date.parse(a.start_time) - Date.parse(b.start_time));
+  if (!list.length) return `<div class="whs">Sov fights: none in range</div>`;
+  return `<div class="whs">Sov fights: ${list.map(c => {
+    const s = state.systems.get(c.solar_system_id), st = Date.parse(c.start_time);
+    return `<b>${esc(s.name)}</b> (${esc(eventName(c))}, ${s.dist}j, ${st <= now ? "under way" : "starts in " + dur(st - now)}, defender ${esc(nm(c.defender_id))})`;
+  }).join(" · ")}</div>`;
+}
+function sovAlerts() {
+  const now = Date.now();
+  for (const c of state.campaigns) {
+    const s = state.systems.get(c.solar_system_id) || (cfg.alWatch ? state.watch.get(c.solar_system_id) : null); if (!s) continue;
+    const live = Date.parse(c.start_time) <= now, k1 = "sovnew" + c.campaign_id, k2 = "sovlive" + c.campaign_id;
+    if (!state.sovPrimed) { alerted.add(k1); if (live) alerted.add(k2); continue; } // don't alert on fights that existed when the map loaded
+    if (!cfg.showSov || !cfg.alSov) continue;
+    if (!alerted.has(k1)) {
+      if (live) alerted.add(k2);
+      fireAlert(k1, `Sov fight in ${s.name}: ${eventName(c)}`, live ? "Under way now" : `Starts in ${dur(Date.parse(c.start_time) - now)}`, `Sov fight, ${say(s.name)}`);
+    } else if (live) fireAlert(k2, `Sov fight starting in ${s.name}`, `${eventName(c)}, defender ${nm(c.defender_id)}`, `Sov fight starting, ${say(s.name)}`);
+  }
+}
+const ESS_RE = /\b(ess|essing|linking|linked|link(ing)? up|main bank|reserve bank|reserve key|bank)\b/i;
+const isEss = msg => ESS_RE.test(msg);
+let groupInfo = {};
+try { groupInfo = JSON.parse(ls.get("groupInfo", "{}")) || {}; } catch {}
+async function loadCats(groupIds) {
+  const need = [...new Set(groupIds.filter(g => g && groupInfo[g] == null))];
+  if (!need.length) return;
+  await pool(need, 6, async g => { try { const d = await getJSON(`${ESI}/universe/groups/${g}/?${DS}`); groupInfo[g] = { c: d.category_id, n: d.name }; } catch {} });
+  ls.set("groupInfo", JSON.stringify(groupInfo));
+}
+// Upwell structures (65), sovereignty structures (40) and starbases (23)
+function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65, 40, 23].includes(g.c) ? g.n : null; }
+$("#sovLegend").hidden = !cfg.showSov;
+
+/* ---------- watched systems (anywhere, on or off the map) ---------- */
+const APP_VERSION = "2.1";
+let watchGen = 0;
+function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
+async function loadWatch() {
+  const g = ++watchGen, note = $("#watchNote"), names = watchNames();
+  $("#watch").value = cfg.watch || "";
+  if (!names.length) {
+    state.watch = new Map(); renderWatch();
+    note.textContent = "Watch systems anywhere in New Eden, even ones off the map. Kills, intel, gate camps and sov fights there are tracked and can alert you.";
+    note.className = "note"; return;
+  }
+  note.textContent = `Looking up ${names.length} system${names.length === 1 ? "" : "s"}…`; note.className = "note";
+  let r;
+  try { r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON(names)); }
+  catch { if (g === watchGen) { note.textContent = "Couldn't look up those systems right now. Try Watch again in a minute."; note.className = "note err"; } return; }
+  const found = r.systems || [];
+  const miss = names.filter(n => !found.some(f => f.name.toLowerCase() === n.toLowerCase()));
+  const infos = (await pool(found, 4, f => systemInfo(f.id).catch(() => null))).filter(Boolean);
+  if (g !== watchGen) return;
+  // keep the order the names were typed in
+  infos.sort((a, b) => names.findIndex(n => n.toLowerCase() === a.name.toLowerCase()) - names.findIndex(n => n.toLowerCase() === b.name.toLowerCase()));
+  state.watch = new Map(infos.map(i => [i.id, { ...i, dist: null }]));
+  await resolveNames(infos.flatMap(i => Object.values(i.gates || {})));
+  applyHourly();
+  note.textContent = miss.length
+    ? `Not found: ${miss.join(", ")}. Check the spelling.${state.watch.size ? ` Watching ${state.watch.size}.` : ""}`
+    : `Watching ${state.watch.size} system${state.watch.size === 1 ? "" : "s"}.`;
+  note.className = "note" + (miss.length ? " err" : "");
+  if (cfg.showSov) await loadSov();
+  renderAll();
+  refreshKills();
+}
+function applyHourly() {
+  if (!state.hourly) return;
+  for (const w of state.watch.values()) {
+    const k = state.hourly.km.get(w.id) || {};
+    w.ship_kills = k.ship_kills || 0; w.pod_kills = k.pod_kills || 0; w.npc_kills = k.npc_kills || 0;
+    w.jumps = state.hourly.jm.get(w.id) || 0;
+  }
+}
+function matchWatch(msg) {
+  const W = [...state.watch.values()]; if (!W.length) return [];
+  const out = new Set();
+  for (const t of msg.toUpperCase().split(/[^A-Z0-9-]+/)) {
+    if (!t) continue;
+    const ex = W.find(s => s.name.toUpperCase() === t);
+    if (ex) { out.add(ex.id); continue; }
+    if (t.length >= 3 && /[-0-9]/.test(t)) { const c = W.filter(s => s.name.toUpperCase().startsWith(t)); if (c.length === 1) out.add(c[0].id); }
+  }
+  return [...out];
+}
+function renderWatch() {
+  const grid = $("#watchGrid"); if (!grid) return;
+  const now = Date.now(), me = youNow();
+  grid.innerHTML = [...state.watch.values()].map(w => {
+    let k1 = 0, k24 = 0; const big = new Set();
+    for (const k of state.kills.values()) if (k.sys === w.id) { if (now - k.time < 36e5) { k1++; killBig(k).forEach(b => big.add(b)); } k24++; }
+    let rep = null;
+    for (const r of intel.reports) if ((!rep || r.t > rep.t) && matchWatch(r.msg).includes(w.id)) rep = r;
+    const live = rep && !isClear(rep.msg) && now - rep.t < 15 * 60e3;
+    if (live) reportBig(rep).forEach(b => big.add(b));
+    const camp = state.camps.get(w.id);
+    const here = me && me.system.toUpperCase() === w.name.toUpperCase();
+    const yd = here ? 0 : me ? distFromYou(w.id) : null;
+    const onMap = state.systems.get(w.id);
+    let chips = here ? `<span class="you">YOU</span>` : "";
+    if (attackedSystems().has(w.id)) chips += `<span class="chip camp">ATTACKED</span>`;
+    if (camp) chips += `<span class="chip camp" title="${esc(`${camp.n} kills on the ${nm(camp.dest)} gate in the last 30 minutes`)}">CAMP</span>`;
+    for (const b of big) chips += `<span class="chip big">${esc(b.toUpperCase())}</span>`;
+    if (cfg.showSov) {
+      const fight = state.campaigns.find(c => c.solar_system_id === w.id);
+      let vuln = null;
+      for (const x of state.sovStructs) if (x.solar_system_id === w.id) { const a = Date.parse(x.vulnerable_start_time), b = Date.parse(x.vulnerable_end_time); if (a <= now && now < b) vuln = b; }
+      if (fight) { const st = Date.parse(fight.start_time); chips += `<span class="chip sov" title="${esc(`${eventName(fight)} fight, defender ${nm(fight.defender_id)}`)}">FIGHT ${st <= now ? "LIVE" : dur(st - now)}</span>`; }
+      else if (vuln) chips += `<span class="chip sov">VULN ${dur(vuln - now)}</span>`;
+      if (live && isEss(rep.msg)) chips += `<span class="chip ess">ESS</span>`;
+    }
+    if (cfg.showWh) for (const x of state.wh) if (x.in_system_id === w.id) chips += `<span class="chip wh" title="${esc(`${x.out_system_name} connection${x.max_ship_size ? ", " + x.max_ship_size : ""}`)}">${x.out_system_name === "Thera" ? "TH" : "TU"}</span>`;
+    const stat = (label, v, hot) => `<div>${label}<b class="${v ? (hot ? "hot" : "") : "zero"}">${v ?? 0}</b></div>`;
+    const intelTxt = rep
+      ? `${ago(rep.t)}: ${esc(rep.msg)} · ${esc(rep.who)}`
+      : intel.dir ? "No intel in the last hour" : "Connect chat logs for intel";
+    const where = [here ? "you are here" : yd != null ? `${yd}j from you` : "", onMap ? `on map, ${onMap.dist}j` : "off map"].filter(Boolean).join(" · ");
+    return `<div class="wcard${k1 || camp ? " hot" : live ? " intel" : ""}">
+      <div class="wh"><span class="wname">${esc(w.name)}</span><span class="sec" style="color:${secColor(w.sec)}">${fmtSec(w.sec)}</span>${chips}</div>
+      <div class="wstats">${stat("Kills 1h", k1, true)}${stat("Kills 24h", k24)}${stat("Jumps 1h", w.jumps)}${stat("Rats 1h", w.npc_kills)}</div>
+      <div class="wintel${live ? " live" : ""}" title="${rep ? esc(rep.msg) : ""}">${intelTxt}</div>
+      <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><button type="button" data-center="${esc(w.name)}">Center map</button><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
+    </div>`;
+  }).join("");
+}
+$("#watchForm").addEventListener("submit", e => {
+  e.preventDefault();
+  cfg.watch = $("#watch").value.trim(); saveCfg(); loadWatch();
+});
+$("#watchGrid").addEventListener("click", e => {
+  const c = e.target.closest("[data-center]"), u = e.target.closest("[data-unwatch]");
+  if (c) { const n = c.dataset.center.toUpperCase(); $("#origin").value = n; ls.set("origin", n); start(n, +$("#radius").value); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  if (u) { cfg.watch = watchNames().filter(n => n.toLowerCase() !== u.dataset.unwatch.toLowerCase()).join(", "); saveCfg(); loadWatch(); }
+});
+
+/* ---------- About window ---------- */
+$("#aboutVer").textContent = `Version ${APP_VERSION}`;
+$("#aboutBtn").addEventListener("click", () => { const d = $("#about"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); });
+$("#aboutClose").addEventListener("click", () => $("#about").close());
+$("#about").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); }); // click outside closes
+loadWatch();
+
+/* ---------- EVE login (EVE SSO with PKCE, no secret) and character notifications ---------- */
+const SSO = "https://login.eveonline.com/v2/oauth";
+const SCOPES = "esi-characters.read_notifications.v1";
+const callbackUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
+let chars = [];
+try { chars = JSON.parse(ls.get("chars", "[]")) || []; } catch {}
+const saveChars = () => ls.set("chars", JSON.stringify(chars));
+chars.forEach(c => state.names.set(c.id, c.name));
+state.notifs = new Map(); state.notifAt = null;
+let notifSeen = new Set();
+try { notifSeen = new Set(JSON.parse(ls.get("notifSeen", "[]")) || []); } catch {}
+
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function jwtPayload(t) {
+  let p = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  p += "=".repeat((4 - p.length % 4) % 4);
+  return JSON.parse(decodeURIComponent(escape(atob(p))));
+}
+function ssoMsg(msg, err) { const n = $("#ssoNote"); n.textContent = msg; n.className = "note" + (err ? " err" : ""); }
+const fmtEve = ms => new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " EVE";
+
+async function ssoLogin() {
+  const cid = (cfg.ssoClient || "").trim();
+  if (!cid) return ssoMsg("Paste your app's Client ID first. The About window explains how to get one.", true);
+  if (location.protocol === "file:") return ssoMsg("EVE login needs the page on a web address, not a file opened from your disk. Put it on GitHub Pages or run it at http://localhost (see About).", true);
+  if (!window.crypto?.subtle) return ssoMsg("This browser can't do the secure login here. Use an https:// address or http://localhost.", true);
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const st = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  ls.set("ssoPending", JSON.stringify({ verifier, state: st }));
+  const u = new URL(SSO + "/authorize");
+  u.search = new URLSearchParams({ response_type: "code", redirect_uri: callbackUrl(), client_id: cid, scope: SCOPES, code_challenge: challenge, code_challenge_method: "S256", state: st }).toString();
+  location.assign(u.toString());
+}
+async function tokenRequest(params) {
+  const r = await fetch(SSO + "/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(params) });
+  if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`${r.status} ${t.slice(0, 160)}`); }
+  return r.json();
+}
+async function ssoCallback() {
+  const qs = new URLSearchParams(location.search);
+  const code = qs.get("code"), st = qs.get("state"), err = qs.get("error");
+  if (!code && !err) return;
+  try { history.replaceState(null, "", callbackUrl()); } catch {} // drop the one-time code from the address bar
+  if (err) return ssoMsg(`EVE login was cancelled or refused (${err}).`, true);
+  let pend = null;
+  try { pend = JSON.parse(ls.get("ssoPending", "null")); } catch {}
+  ls.set("ssoPending", "null");
+  if (!pend || pend.state !== st) return ssoMsg("This login didn't match the request the page sent. Press Log in with EVE again.", true);
+  $("#settings").open = true;
+  ssoMsg("Finishing login…");
+  try { addChar(await tokenRequest({ grant_type: "authorization_code", code, client_id: cfg.ssoClient, code_verifier: pend.verifier })); }
+  catch (e) { ssoMsg("EVE login failed: " + e.message + ". Check that the Client ID and callback URL match your app.", true); }
+}
+function addChar(tok) {
+  const p = jwtPayload(tok.access_token);
+  const id = +String(p.sub).split(":").pop();
+  chars = chars.filter(x => x.id !== id).concat({ id, name: p.name, access: tok.access_token, refresh: tok.refresh_token, exp: Date.now() + (tok.expires_in || 1199) * 1000 });
+  saveChars(); state.names.set(id, p.name);
+  ssoMsg(`Logged in as ${p.name}.`);
+  renderChars(); loadNotifs();
+}
+async function accessFor(c) {
+  if (c.access && c.exp - 60e3 > Date.now()) return c.access;
+  const tok = await tokenRequest({ grant_type: "refresh_token", refresh_token: c.refresh, client_id: cfg.ssoClient });
+  c.access = tok.access_token; c.exp = Date.now() + (tok.expires_in || 1199) * 1000;
+  if (tok.refresh_token) c.refresh = tok.refresh_token;
+  saveChars();
+  return c.access;
+}
+async function logout(id) {
+  const c = chars.find(x => x.id === id); if (!c) return;
+  chars = chars.filter(x => x.id !== id); saveChars();
+  for (const [k, n] of state.notifs) if (n.char === id) state.notifs.delete(k);
+  try { await fetch(SSO + "/revoke", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token_type_hint: "refresh_token", token: c.refresh, client_id: cfg.ssoClient }) }); } catch {}
+  ssoMsg(`Logged out ${c.name}.`); renderChars(); renderNotifs();
+}
+function renderChars() {
+  $("#ssoChars").innerHTML = chars.map(c => `<div class="charrow"><b>${esc(c.name)}</b>${c.err ? ` <span class="note err">${esc(c.err)}</span>` : ""}<button type="button" data-logout="${c.id}">Log out</button></div>`).join("");
+}
+
+/* notifications: CCP caches these for about 10 minutes */
+function parseYaml(t) {
+  const o = {};
+  for (const line of t.split(/\r?\n/)) {
+    const m = line.match(/^([A-Za-z_]\w*):\s*(.*)$/); if (!m) continue;
+    let v = m[2].trim().replace(/^&\w+\s+/, "").replace(/^['"]|['"]$/g, "");
+    if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(v)) v = +v;
+    o[m[1]] = v;
+  }
+  return o;
+}
+const sysOf = x => x.data.solarsystemID || x.data.solarSystemID || x.data.systemID || null;
+const notifIds = x => { const d = x.data; return [sysOf(x), d.structureTypeID, d.typeID, d.charID, d.aggressorID, d.corpID, d.allianceID, d.aggressorCorpID, d.aggressorAllianceID, x.sender_id].filter(v => typeof v === "number" && v > 0); };
+function notifKind(type) {
+  if (/UnderAttack|Attacked|LostShields|LostArmor|Reinforced|Destroyed|Entosis|CommandNode|DamageMsg|AggressorAlert/i.test(type)) return "attack";
+  if (/Fuel|LowPower|ResourceAlert|ServicesOffline|Reagents|Abandon|Unanchor/i.test(type)) return "warn";
+  if (/War/i.test(type)) return "war";
+  if (/KillReport/i.test(type)) return "kill";
+  return "info";
+}
+function notifText(x) {
+  const d = x.data, parts = [];
+  const title = x.type.replace(/Msg$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+  const tid = d.structureTypeID || d.typeID; if (typeof tid === "number") parts.push(nm(tid));
+  const sys = sysOf(x); if (sys) parts.push("in " + nm(sys));
+  const hp = [["shieldPercentage", "S", 1], ["armorPercentage", "A", 1], ["hullPercentage", "H", 1], ["shieldValue", "S", 100], ["armorValue", "A", 100], ["hullValue", "H", 100]]
+    .filter(([k]) => typeof d[k] === "number").map(([k, l, f]) => `${l} ${Math.round(d[k] * f)}%`);
+  if (hp.length) parts.push(hp.join(" "));
+  const who = d.charID || d.aggressorID;
+  if (typeof who === "number") parts.push("by " + nm(who) + (d.corpName ? ` (${d.corpName}${d.allianceName ? ", " + d.allianceName : ""})` : ""));
+  if (typeof d.timeLeft === "number" && d.timeLeft > 0) parts.push(`timer ends about ${fmtEve(x.t + d.timeLeft / 1e4)}`); // timeLeft is in 100 ns ticks
+  return { title, detail: parts.join(" · ") };
+}
+function attackedSystems() {
+  const out = new Set(), now = Date.now();
+  if (!state.notifs) return out; // called before the login code has run
+  for (const x of state.notifs.values()) if (now - x.t < 36e5 && notifKind(x.type) === "attack" && sysOf(x)) out.add(sysOf(x));
+  return out;
+}
+async function loadNotifs() {
+  if (!chars.length) { renderNotifs(); return; }
+  const fresh = [];
+  for (const c of chars) {
+    try {
+      const tok = await accessFor(c);
+      const list = await getJSON(`${ESI}/characters/${c.id}/notifications/?${DS}`, { headers: { Authorization: "Bearer " + tok } }, 2);
+      c.err = null;
+      for (const n of list) if (!state.notifs.has(n.notification_id)) {
+        const x = { ...n, char: c.id, t: Date.parse(n.timestamp), data: parseYaml(n.text || ""), quiet: !c.primed };
+        state.notifs.set(n.notification_id, x); fresh.push(x);
+      }
+      c.primed = true; // first load after login: show what's there, but don't alert on it
+    } catch (e) {
+      c.err = /^400|invalid_grant/.test(e.message) ? "Login expired. Log out and log in again." : "Couldn't load notifications: " + e.message;
+    }
+  }
+  saveChars();
+  await resolveNames(fresh.flatMap(notifIds));
+  for (const x of fresh) {
+    if (!notifSeen.has(x.notification_id) && !x.quiet && Date.now() - x.t < 2 * 36e5) notifAlert(x);
+    notifSeen.add(x.notification_id);
+  }
+  ls.set("notifSeen", JSON.stringify([...notifSeen].slice(-3000)));
+  state.notifAt = Date.now();
+  renderChars(); renderNotifs(); renderMap(); renderTable(); renderWatch();
+}
+function notifAlert(x) {
+  if (!cfg.alNotif) return;
+  const k = notifKind(x.type);
+  if (k === "attack" || k === "war" || (k === "warn" && cfg.alNotifWarn)) {
+    const t = notifText(x), sys = sysOf(x);
+    fireAlert("n" + x.notification_id, t.title, `${nm(x.char)}: ${t.detail}`, t.title + (sys ? ", " + say(nm(sys)) : ""));
+  }
+}
+function renderNotifs() {
+  const feed = $("#notifFeed"), note = $("#notifNote");
+  if (!chars.length) {
+    note.textContent = "Log in with EVE in Alerts and settings to see your characters' notifications here: structure attacks and timers, fuel, sov, wars and more.";
+    note.className = "note"; feed.innerHTML = ""; return;
+  }
+  const errs = chars.filter(c => c.err).map(c => `${c.name}: ${c.err}`);
+  note.textContent = `${chars.map(c => c.name).join(", ")} · ${state.notifAt ? "updated " + new Date(state.notifAt).toLocaleTimeString() : "loading…"} · CCP refreshes these about every 10 minutes${errs.length ? " · " + errs.join(" · ") : ""}`;
+  note.className = "note" + (errs.length ? " err" : "");
+  const list = [...state.notifs.values()].sort((a, b) => b.t - a.t).slice(0, 100);
+  if (!list.length) { feed.innerHTML = `<div class="empty">No notifications yet.</div>`; return; }
+  const LABEL = { attack: ["ATTACK", "camp"], warn: ["WARNING", "big"], war: ["WAR", "camp"], kill: ["KILL", "wh"], info: ["INFO", "flag"] };
+  feed.innerHTML = list.map(x => {
+    const k = notifKind(x.type), [lab, cls] = LABEL[k], t = notifText(x), sys = sysOf(x);
+    const s = sys && (state.systems.get(sys) || state.watch.get(sys));
+    const link = x.data.killMailID ? ` <a href="https://zkillboard.com/kill/${x.data.killMailID}/" target="_blank" rel="noopener">killmail</a>` : "";
+    const fresh = k !== "info" && Date.now() - x.t < 36e5;
+    return `<div class="kill"><span class="t${fresh ? " fresh" : ""}" title="${fmtEve(x.t)}">${ago(x.t)}</span>
+      <span class="what"><span class="chip ${cls}" style="margin:0 6px 0 0">${lab}</span><b>${esc(t.title)}</b> <span class="who">${esc(t.detail)}${s ? ` (${s.dist != null ? s.dist + "j" : "watched"})` : ""}</span>${link}</span>
+      <span class="v">${esc(nm(x.char))}</span></div>`;
+  }).join("");
+}
+
+$("#ssoCb").textContent = callbackUrl();
+$("#ssoLogin").addEventListener("click", ssoLogin);
+$("#ssoCopy").addEventListener("click", () => {
+  const txt = callbackUrl();
+  navigator.clipboard?.writeText(txt).then(() => ssoMsg("Callback URL copied."), () => { getSelection().selectAllChildren($("#ssoCb")); ssoMsg("Press Ctrl+C to copy the selected address."); })
+    ?? (getSelection().selectAllChildren($("#ssoCb")), ssoMsg("Press Ctrl+C to copy the selected address."));
+});
+$("#ssoChars").addEventListener("click", e => { const b = e.target.closest("[data-logout]"); if (b) logout(+b.dataset.logout); });
+if (location.protocol === "file:") ssoMsg("To log in, the page must be on a web address (GitHub Pages or http://localhost). The About window explains how.");
+renderChars(); renderNotifs();
+ssoCallback().then(loadNotifs);
+setInterval(loadNotifs, 5 * 60e3);
+
+/* ---------- interaction ---------- */
+function select(id) { state.sel = state.sel === id ? null : id; renderMap(); renderTable(); renderFeed(); }
+$("#map").addEventListener("click", e => { const g = e.target.closest("g[data-id]"); if (g) select(+g.dataset.id); });
+$("#tbl tbody").addEventListener("click", e => { if (e.target.closest("a")) return; const tr = e.target.closest("tr[data-id]"); if (tr) select(+tr.dataset.id); });
+$("#tbl thead").addEventListener("click", e => {
+  const th = e.target.closest("th"); if (!th) return;
+  const k = th.dataset.k;
+  state.sort = { k, dir: state.sort.k === k ? -state.sort.dir : (k === "name" || k === "dist" || k === "sov" ? 1 : -1) };
+  renderTable();
+});
+
+let tKills, tHourly, busy = false;
+async function refreshKills() {
+  if (busy) { state.killsAgain = true; return; }
+  busy = true; const gen = state.gen;
+  try { await loadKills(); state.primedFor = state.lastLoadedFor; renderAll(); setStatus(`Updated ${new Date().toLocaleTimeString()} · ${state.systems.size} systems`); }
+  catch (e) { setStatus("Kill feed failed: " + e.message, true); }
+  busy = false;
+  if (state.killsAgain) { state.killsAgain = false; refreshKills(); }
+}
+async function refreshHourly() { try { await loadHourly(); renderAll(); } catch (e) { setStatus("ESI stats failed: " + e.message, true); } }
+
+async function start(origin, radius) {
+  const gen = ++state.gen; state.target = origin.toUpperCase();
+  clearInterval(tKills); clearInterval(tHourly);
+  try {
+    const nb = await buildNeighborhood(origin, radius);
+    if (gen !== state.gen) return; // a newer start (e.g. you jumped again) took over
+    // killmails are kept across moves so following you around stays cheap
+    state.origin = nb.origin; state.systems = nb.systems; state.radius = radius; state.sel = null;
+    state.campKeys = new Set(); state.sovPrimed = false; bfsMemo.key = null;
+    const o = state.systems.get(state.origin);
+    state.target = o.name.toUpperCase();
+    document.title = state.baseTitle = `${o.name} Local Intel`;
+    $("#title").innerHTML = `${esc(o.name)} Local Intel<small>${esc(o.region || "")}${o.constellationName ? " · " + esc(o.constellationName) : ""} · ${radius}-jump radius · ${state.systems.size} systems</small>`;
+    setStatus("Loading hourly stats…");
+    await loadHourly(); if (gen !== state.gen) return; renderAll();
+    loadWormholes().then(() => { if (gen === state.gen) renderAll(); });
+    loadSov().then(() => { if (gen === state.gen) { state.sovPrimed = true; renderAll(); } });
+    await refreshKills(); if (gen !== state.gen) return;
+    intelReady();
+    tKills = setInterval(refreshKills, 2 * 60e3);
+    tHourly = setInterval(() => { refreshHourly(); loadWormholes().then(renderAll); loadSov().then(renderAll); }, 10 * 60e3);
+  } catch (e) { if (gen === state.gen) setStatus(e.message, true); }
+}
+
+$("#cfg").addEventListener("submit", e => { e.preventDefault(); ls.set("origin", $("#origin").value.trim().toUpperCase()); ls.set("radius", $("#radius").value); start($("#origin").value.trim().toUpperCase(), +$("#radius").value); });
+$("#refresh").addEventListener("click", () => { refreshHourly(); refreshKills(); loadNotifs(); });
+setInterval(() => { if (state.systems.size) renderAll(); }, 30e3); // keep "x m ago", camps and rings fresh
+
+const qp = new URLSearchParams(location.search);
+state.pinned = !!qp.get("system"); // a system named in the link wins over your location
+const o0 = (qp.get("system") || ls.get("origin", "")).toUpperCase(), r0 = Math.min(5, Math.max(1, +qp.get("jumps") || +ls.get("radius", 3) || 3));
+$("#origin").value = o0; $("#radius").value = r0;
+(async () => {
+  // 1) link's system, 2) where you are now (if the chat log folder is still allowed), 3) last system you loaded
+  if (!state.pinned && window.showDirectoryPicker) {
+    const h = await kvGet("dir");
+    try { if (h && await h.queryPermission({ mode: "read" }) === "granted") { intel.dir = h; startIntel(); if (await followLocation()) return; } } catch {}
+  }
+  if (o0) start(o0, r0);
+  else {
+    setStatus("Enter a system name and press Load, or connect your chat logs folder to start where you are.");
+    $("#feed").innerHTML = `<div class="empty">Kills appear here once a system is loaded.</div>`;
+    intelReady();
+  }
+})();
+</script>
+</body>
+</html>
