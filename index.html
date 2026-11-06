@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.8
+  Local Intel, version 2.9
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -235,8 +235,22 @@ dialog.about::backdrop { background: rgba(0, 0, 0, .6); }
 .spark rect { fill: var(--hot); }
 .spark rect.base { fill: var(--line); }
 .spark polyline { fill: none; stroke: var(--accent); stroke-width: 1; }
-.whs { flex-basis: 100%; font: 12px var(--mono); color: var(--muted); }
-.summary .whs b { display: inline; font: 500 12px var(--mono); color: var(--accent); }
+/* Thera/Turnur and sov fights share one row; each lights up when it has something in range */
+.specials { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.spec { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); font: 13px var(--mono); color: var(--muted); }
+.spec .lbl { font: 700 12px var(--display); letter-spacing: .12em; text-transform: uppercase; }
+.spec .none { font-size: 12px; }
+.spec .item { color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
+.summary .spec .item b { display: inline; font: 700 14px var(--display); margin-right: 4px; }
+.spec-wh .lbl { color: var(--accent); }
+.spec-sov .lbl { color: var(--sov); }
+.spec-wh.on { border-color: var(--accent); background: rgba(79,179,217,.10); }
+.spec-wh.on .item b { color: var(--accent); }
+.spec-sov.on { border-color: var(--sov); background: rgba(230,200,74,.10); }
+.spec-sov.on .item b { color: var(--sov); }
+.spec .item.live { border-color: var(--hot); color: var(--hot); }
+@media (prefers-reduced-motion: no-preference) { .spec .item.live { animation: livepulse 2s ease-in-out infinite; } }
+@keyframes livepulse { 50% { background: rgba(255,90,60,.18); } }
 #map .tag { font-size: 9px; font-weight: 600; }
 #map .tag.camp { fill: var(--hot); }
 #map .tag.big { fill: var(--warm); }
@@ -437,7 +451,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.8</span>
+    <span class="ver" id="aboutVer">Version 2.9</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -479,7 +493,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
     <p>Notifications update every 5 minutes, but CCP only refreshes them about every 10, so they can be up to 10 minutes behind. Notifications that were already there when you log in don't alert. Your login is saved in this browser only. <b>Log out</b> removes it and cancels it with CCP.</p>
 
     <h3>Layout</h3>
-    <p>From the top: the summary numbers; the gate map with the systems table and intel beside it; watched systems; then <b>Alerts and settings</b>, <b>Character notifications</b> and <b>Kills</b>. Each of the last three has a <b>–</b> button that collapses it into a small button in a row above them. Press the small button to open it again. The page remembers which are open. A collapsed Character notifications button shows how many attacks arrived in the last hour.</p>
+    <p>From the top: the summary numbers, with Thera/Turnur connections and sov fights side by side below them (each box lights up when there's something in range, and a sov fight under way pulses red); the gate map with the systems table and intel beside it; watched systems; then <b>Alerts and settings</b>, <b>Character notifications</b> and <b>Kills</b>. Each of the last three has a <b>–</b> button that collapses it into a small button in a row above them. Press the small button to open it again. The page remembers which are open. A collapsed Character notifications button shows how many attacks arrived in the last hour.</p>
 
     <h3>Using your EVE login</h3>
     <p>These need extra permissions. A character logged in before version 2.8 shows <b>Allow new features</b> under EVE login: press it and approve once. Actions use the character you're flying (your latest jump), or another logged-in character that has the permission.</p>
@@ -568,6 +582,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.9</b> Thera/Turnur connections and sov fights share one row under the summary numbers, and light up when something is in range. Sov fights under way pulse red.</li>
       <li><b>2.8</b> With the EVE login: set your destination or waypoints from the page, a route planner that avoids camps, kills and reported hostiles and sends the route to your autopilot, standings from your EVE contacts, fleet members on the map, ship-aware alerts, jump fatigue, and opening pilots and systems in EVE.</li>
       <li><b>2.7</b> Kill limit raised from 200 to 1,000 per system by default, adjustable from 200 to 2,000. A count that hit the limit shows a "+".</li>
       <li><b>2.6</b> Watched systems moved below the map, and each opens in its own tab that stays on that system. Alerts and settings, Character notifications and Kills collapse into small buttons. With several tabs open, each alert plays only once.</li>
@@ -971,8 +986,7 @@ function renderSummary() {
     <div>Rats killed, last hour<b>${sum("npc_kills")}</b></div>
     <div>Hot right now<b style="font-size:16px">${esc(hot)}</b></div>
     <div class="${mapCamps ? "hotv" : ""}">Possible gate camps<b>${mapCamps}</b></div>
-    ${whSummary()}
-    ${sovSummary()}`;
+    <div class="specials">${whSummary()}${sovSummary()}</div>`;
 }
 
 function renderAll() { renderWatch(); computeCounts(); computeCamps(); campAlerts(); sovAlerts(); computeIntel(); renderIntel(); renderSummary(); renderMap(); renderTable(); renderFeed(); }
@@ -1506,12 +1520,12 @@ function whMap() {
 function whSummary() {
   if (!cfg.showWh) return "";
   const list = [...whMap().values()].flat().sort((a, b) => state.systems.get(a.in_system_id).dist - state.systems.get(b.in_system_id).dist);
-  if (!list.length) return `<div class="whs">Thera / Turnur: no connections in range</div>`;
-  return `<div class="whs">Thera / Turnur: ${list.map(w => {
+  if (!list.length) return `<div class="spec spec-wh"><span class="lbl">Thera / Turnur</span><span class="none">no connections in range</span></div>`;
+  return `<div class="spec spec-wh on"><span class="lbl">Thera / Turnur</span>${list.map(w => {
     const s = state.systems.get(w.in_system_id);
-    const hrs = w.remaining_hours != null ? `, ${w.remaining_hours}h left` : "";
-    return `<b>${esc(s.name)}</b> (${esc(w.out_system_name)}, ${s.dist}j${w.max_ship_size ? ", " + esc(w.max_ship_size) : ""}${hrs})`;
-  }).join(" · ")}</div>`;
+    const hrs = w.remaining_hours != null ? ` · ${w.remaining_hours}h left` : "";
+    return `<span class="item"><b>${esc(s.name)}</b> ${esc(w.out_system_name)} · ${s.dist}j${w.max_ship_size ? " · " + esc(w.max_ship_size) : ""}${hrs}</span>`;
+  }).join("")}</div>`;
 }
 
 /* ---------- table extras ---------- */
@@ -1728,11 +1742,11 @@ function sovSummary() {
   if (!cfg.showSov) return "";
   const now = Date.now();
   const list = [...fightMap().values()].sort((a, b) => Date.parse(a.start_time) - Date.parse(b.start_time));
-  if (!list.length) return `<div class="whs">Sov fights: none in range</div>`;
-  return `<div class="whs">Sov fights: ${list.map(c => {
-    const s = state.systems.get(c.solar_system_id), st = Date.parse(c.start_time);
-    return `<b>${esc(s.name)}</b> (${esc(eventName(c))}, ${s.dist}j, ${st <= now ? "under way" : "starts in " + dur(st - now)}, defender ${esc(nm(c.defender_id))})`;
-  }).join(" · ")}</div>`;
+  if (!list.length) return `<div class="spec spec-sov"><span class="lbl">Sov fights</span><span class="none">none in range</span></div>`;
+  return `<div class="spec spec-sov on"><span class="lbl">Sov fights</span>${list.map(c => {
+    const s = state.systems.get(c.solar_system_id), st = Date.parse(c.start_time), live = st <= now;
+    return `<span class="item${live ? " live" : ""}"><b>${esc(s.name)}</b> ${esc(eventName(c))} · ${s.dist}j · ${live ? "UNDER WAY" : "starts in " + dur(st - now)} · defender ${esc(nm(c.defender_id))}</span>`;
+  }).join("")}</div>`;
 }
 function sovAlerts() {
   const now = Date.now();
@@ -1762,7 +1776,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.8";
+const APP_VERSION = "2.9";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
