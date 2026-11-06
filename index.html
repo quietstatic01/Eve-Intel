@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.9
+  Local Intel, version 2.10
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -182,21 +182,25 @@ tr:hover td { background: #141d27; }
 .watchform button, .wcard button { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 4px 9px; cursor: pointer; }
 .watchform button:hover, .wcard button:hover { background: var(--accent); color: var(--bg); }
 #watchNote { margin-top: 6px; }
-.watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.watchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 10px; margin-top: 10px; }
 .watchgrid:empty { display: none; }
 .wcard { border: 1px solid var(--line); border-radius: 4px; padding: 10px; display: grid; gap: 7px; font: 12px var(--mono); min-width: 0; background: var(--bg); }
 .wcard.hot { border-color: var(--hot); }
 .wcard.intel { border-color: var(--intel); }
 .wcard .wh { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px; }
 .wcard .wname { font: 600 16px var(--display); color: var(--fg); margin-right: 4px; }
-.wcard .wstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.wcard .wstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; color: var(--muted); font-size: 10px; white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; }
 .wcard .wstats b { display: block; font: 500 14px var(--mono); color: var(--fg); text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .wcard .wstats b.hot { color: var(--hot); }
 .wcard .wstats b.zero { color: #3b4856; }
 .wcard .wintel { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wcard .wintel.live { color: var(--intel); }
-.wcard .wfoot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
-.wcard .wfoot span:last-child { display: flex; gap: 6px; align-items: center; }
+/* card footer: distance on its own line, then one row of equal-height buttons that wraps rather than squeezing */
+.wcard .wfoot { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+.wcard .wfoot span:last-child { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.wcard .wfoot span:last-child > * { white-space: nowrap; line-height: 1.3; font: 11px var(--mono); padding: 3px 6px; border-radius: 4px; }
+.wcard .wfoot span:last-child > a:first-child { border: 1px solid var(--line); color: var(--accent); }
+.wcard .wfoot span:last-child > a:first-child:hover { border-color: var(--accent); text-decoration: none; }
 dialog.about { width: min(780px, calc(100vw - 32px)); max-height: 86vh; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
 dialog.about::backdrop { background: rgba(0, 0, 0, .6); }
 .abouthead { position: sticky; top: 0; display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -451,7 +455,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.9</span>
+    <span class="ver" id="aboutVer">Version 2.10</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -582,6 +586,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.10</b> Watched-system cards are a little wider and their buttons sit on one tidy row below the distance, instead of squeezing beside it.</li>
       <li><b>2.9</b> Thera/Turnur connections and sov fights share one row under the summary numbers, and light up when something is in range. Sov fights under way pulse red.</li>
       <li><b>2.8</b> With the EVE login: set your destination or waypoints from the page, a route planner that avoids camps, kills and reported hostiles and sends the route to your autopilot, standings from your EVE contacts, fleet members on the map, ship-aware alerts, jump fatigue, and opening pilots and systems in EVE.</li>
       <li><b>2.7</b> Kill limit raised from 200 to 1,000 per system by default, adjustable from 200 to 2,000. A count that hit the limit shows a "+".</li>
@@ -1776,7 +1781,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.9";
+const APP_VERSION = "2.10";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
