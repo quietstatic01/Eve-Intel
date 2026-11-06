@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.4
+  Local Intel, version 2.5
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -332,10 +332,11 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <fieldset>
         <legend>Map</legend>
         <label><input type="checkbox" id="follow"> Follow me: re-center the map when I jump</label>
+        <label><input type="checkbox" id="locEsi"> Get my location from my EVE login</label>
         <label><input type="checkbox" id="showRats"> Show ratting activity (green glow)</label>
         <label><input type="checkbox" id="showSov"> Show sov timers, sov fights, structure kills and ESS reports</label>
         <label><input type="checkbox" id="showWh"> Show Thera and Turnur wormholes</label>
-        <div class="note">Following and "where I am" need the chat logs folder connected.</div>
+        <div class="note">Following and "where I am" need your location: from the EVE login, or from the Local chat log when the chat logs folder is connected.</div>
         <div class="note" id="whNote"></div>
       </fieldset>
       <fieldset>
@@ -381,7 +382,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.4</span>
+    <span class="ver" id="aboutVer">Version 2.5</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -405,6 +406,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
     </ul>
 
     <h3>EVE login and notifications</h3>
+    <p>The login also tells the page which system each logged-in character is in, checked every 10 seconds, and whether they're online. This works without the chat logs folder, even on another computer. You can turn it off with "Get my location from my EVE login" in Alerts and settings. A character logged in before version 2.5 shows <b>Allow location</b>: press it and approve once more.</p>
     <p>Log in with EVE to see your characters' notifications in the <b>Character notifications</b> panel: structures under attack, shields and armor lost with the timer, fuel and low power warnings, sov events, wars, kill reports and the rest. Attacks put an <b>ATTACKED</b> tag on the system for an hour.</p>
     <p>On the official page, <code>https://quietstatic01.github.io/Eve-Intel/</code>, all of this is already set up: just press <b>Log in with EVE</b> in Alerts and settings. A copy hosted anywhere else needs its own one-time setup:</p>
     <ol>
@@ -414,7 +416,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
           <li><b>Your own computer</b>: in the folder with the file, run <code>python -m http.server 8000</code> and open <code>http://localhost:8000/</code>.</li>
         </ul>
       </li>
-      <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permission <code>esi-characters.read_notifications.v1</code>, and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
+      <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permissions <code>esi-characters.read_notifications.v1</code>, <code>esi-location.read_location.v1</code> and <code>esi-location.read_online.v1</code>, and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
       <li>Copy the app's <b>Client ID</b> into the Client ID box. The page doesn't need the secret key, so never paste the secret anywhere.</li>
       <li>Press <b>Log in with EVE</b> and approve. Repeat for each character you want.</li>
     </ol>
@@ -453,7 +455,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <li>Big-ship words (titan, super, dread, carrier, fax, lancer, rorq, dictor, hic, blops, caps, cyno) and ship names like "Sabre" get tagged.</li>
       <li>ESS words (ess, linking, main bank, reserve bank, bank) get an ESS tag.</li>
       <li><b>Show</b> lists all intel, or only messages about systems on the map or watched.</li>
-      <li>Your location comes from your Local chat log, updated within seconds of each jump. With several characters logged in, each one is shown.</li>
+      <li>Your location comes from your EVE login (see below) or from your Local chat log, whichever saw your latest jump. Each source is named next to your system. With several characters, each one is shown. A character the EVE login reports as offline isn't shown.</li>
     </ul>
 
     <h3>Kill feed</h3>
@@ -475,7 +477,8 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>How often it updates</h3>
     <table>
-      <tr><td>Intel and your location</td><td>every 1.5 seconds</td></tr>
+      <tr><td>Intel, and your location from the chat log</td><td>every 1.5 seconds</td></tr>
+      <tr><td>Your location from the EVE login</td><td>every 10 seconds (CCP updates about every 5); online status every minute</td></tr>
       <tr><td>Kill feed and kill counts</td><td>every 2 minutes</td></tr>
       <tr><td>Hourly stats, sov, wormholes</td><td>every 10 minutes</td></tr>
       <tr><td>New log files (after relogging)</td><td>every 30 seconds</td></tr>
@@ -492,6 +495,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.5</b> Your location can come from your EVE login, so YOU on the map, follow mode and "jumps from you" work without the chat logs folder.</li>
       <li><b>2.4</b> Catches a callback URL or other text typed into the Client ID box. The official page uses its built-in Client ID instead.</li>
       <li><b>2.3</b> EVE login is ready to use on the official page: its Client ID is built in.</li>
       <li><b>2.2</b> Kills load much faster: zKillboard now sends full killmails, so the page no longer fetches each one separately. Checked against live data. Removed the last region name from the page.</li>
@@ -1017,9 +1021,9 @@ function computeIntel() {
     }
   }
   const byName = new Map([...state.systems.values()].map(s => [s.name.toUpperCase(), s]));
-  for (const f of intel.locals.values()) {
-    const s = f.system && byName.get(f.system.toUpperCase());
-    if (s) s.here.push(f.listener || "you");
+  for (const p of presences()) {
+    const s = byName.get(p.system.toUpperCase());
+    if (s) s.here.push(p.name);
   }
 }
 function countCell(s) {
@@ -1029,12 +1033,14 @@ function countCell(s) {
 }
 function renderYou() {
   const el = $("#youStatus");
-  const here = [...intel.locals.values()].filter(f => f.system);
-  el.innerHTML = here.map(f => {
-    const s = [...state.systems.values()].find(x => x.name.toUpperCase() === f.system.toUpperCase());
-    const where = s ? `${s.dist} jump${s.dist === 1 ? "" : "s"} from ${esc(state.systems.get(state.origin).name)}` : "outside this map";
-    return `<div>${esc(f.listener || "You")}: <b>${esc(f.system)}</b> · ${where}${cfg.follow ? " · following" : ""}</div>`;
-  }).join("");
+  const origin = state.systems.get(state.origin);
+  const rows = presences().map(p => {
+    const s = [...state.systems.values()].find(x => x.name.toUpperCase() === p.system.toUpperCase());
+    const where = s && origin ? `${s.dist} jump${s.dist === 1 ? "" : "s"} from ${esc(origin.name)}` : "outside this map";
+    return `<div>${esc(p.name)}: <b>${esc(p.system)}</b> · ${where}${cfg.follow ? " · following" : ""} <span class="note">from ${p.src}</span></div>`;
+  });
+  for (const e of (state.esiLoc || new Map()).values()) if (e.online === false) rows.push(`<div>${esc(e.name)}: <span class="note">not logged in to EVE</span></div>`);
+  el.innerHTML = rows.join("");
 }
 function intelCell(s) {
   if (s.intelAge == null) return `<span class="zero">–</span>`;
@@ -1043,8 +1049,8 @@ function intelCell(s) {
 }
 
 function renderIntel() {
-  if (!intel.dir) return;
   renderYou();
+  if (!intel.dir) return;
   const lim = +cfg.alRange, fromYou = cfg.alFrom === "you" && youNow();
   const onMap = cfg.intelFilter === "map";
   const list = [...intel.reports].filter(r => !onMap || matchSystems(r.msg).length || matchWatch(r.msg).length).sort((a, b) => b.t - a.t).slice(0, 60);
@@ -1125,7 +1131,7 @@ $("#intelReconnect").addEventListener("click", async () => {
 $("#intelChannels").addEventListener("change", () => { ls.set("intelChannels", $("#intelChannels").value); if (intel.dir) startIntel(); });
 
 /* ---------- settings ---------- */
-const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
+const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, locEsi: true, intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
 let cfg;
 try { cfg = { ...SETTINGS_DEFAULT, ...JSON.parse(ls.get("settings", "{}")) }; } catch { cfg = { ...SETTINGS_DEFAULT }; }
 if (ls.get("settings", null) == null && ls.get("intelAlert", null) != null) cfg.alRange = ls.get("intelAlert"); // older version's setting
@@ -1144,6 +1150,7 @@ function onSetting(k) {
   if (k === "hideFriendly") renderFeed();
   if (k === "showRats") { $("#ratLegend").hidden = !cfg.showRats; renderMap(); }
   if (k === "watch") loadWatch();
+  if (k === "locEsi") { pollLocation(); renderChars(); }
   if (k === "showSov") { $("#sovLegend").hidden = !cfg.showSov; loadSov().then(renderAll); }
   if (k === "alRange" || k === "alFrom" || k === "intelFilter") renderIntel();
 }
@@ -1259,9 +1266,18 @@ function campAlerts() {
 }
 
 /* ---------- where you are, and jumps from you ---------- */
+// every character we know the location of, from the Local chat log and/or the EVE login (newest wins per character)
+function presences() {
+  const out = new Map(), put = p => { const k = p.name.toLowerCase(), cur = out.get(k); if (!cur || p.since >= cur.since) out.set(k, p); };
+  for (const f of intel.locals.values()) if (f.system) put({ name: f.listener || "You", system: f.system, since: f.since || 0, src: "chat log" });
+  for (const e of (state.esiLoc || new Map()).values()) if (e.system && e.online !== false) put({ name: e.name, system: e.system, since: e.since, src: "EVE login" });
+  // a character the EVE login says is offline isn't anywhere, whatever its old chat log says
+  for (const e of (state.esiLoc || new Map()).values()) if (e.online === false) out.delete(e.name.toLowerCase());
+  return [...out.values()];
+}
 function youNow() {
   let best = null;
-  for (const f of intel.locals.values()) if (f.system && (!best || (f.since || 0) > (best.since || 0))) best = f;
+  for (const p of presences()) if (!best || p.since > best.since) best = p;
   return best;
 }
 const bfsMemo = { key: null, d: null };
@@ -1626,7 +1642,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.4";
+const APP_VERSION = "2.5";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1736,7 +1752,8 @@ loadWatch();
 
 /* ---------- EVE login (EVE SSO with PKCE, no secret) and character notifications ---------- */
 const SSO = "https://login.eveonline.com/v2/oauth";
-const SCOPES = "esi-characters.read_notifications.v1";
+const LOC_SCOPES = ["esi-location.read_location.v1", "esi-location.read_online.v1"];
+const SCOPES = ["esi-characters.read_notifications.v1", ...LOC_SCOPES].join(" ");
 const callbackUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
 // the official copy of this page has its own EVE app; copies hosted elsewhere need their own Client ID
 const HOME_URL = "https://quietstatic01.github.io/Eve-Intel/", HOME_CLIENT = "398b1ea0b5714cc38e240a3cbf836079";
@@ -1801,15 +1818,61 @@ function addChar(tok) {
   chars = chars.filter(x => x.id !== id).concat({ id, name: p.name, access: tok.access_token, refresh: tok.refresh_token, exp: Date.now() + (tok.expires_in || 1199) * 1000 });
   saveChars(); state.names.set(id, p.name);
   ssoMsg(`Logged in as ${p.name}.`);
-  renderChars(); loadNotifs();
+  renderChars(); loadNotifs(); pollLocation();
 }
+// one refresh at a time per character: EVE replaces the refresh token each time, so two at once would break the login
+const refreshing = new Map();
 async function accessFor(c) {
   if (c.access && c.exp - 60e3 > Date.now()) return c.access;
-  const tok = await tokenRequest({ grant_type: "refresh_token", refresh_token: c.refresh, client_id: cfg.ssoClient });
-  c.access = tok.access_token; c.exp = Date.now() + (tok.expires_in || 1199) * 1000;
-  if (tok.refresh_token) c.refresh = tok.refresh_token;
-  saveChars();
-  return c.access;
+  if (!refreshing.has(c.id)) refreshing.set(c.id, (async () => {
+    const tok = await tokenRequest({ grant_type: "refresh_token", refresh_token: c.refresh, client_id: cfg.ssoClient });
+    c.access = tok.access_token; c.exp = Date.now() + (tok.expires_in || 1199) * 1000;
+    if (tok.refresh_token) c.refresh = tok.refresh_token;
+    saveChars();
+    return c.access;
+  })().finally(() => refreshing.delete(c.id)));
+  return refreshing.get(c.id);
+}
+function scopesOf(c) { try { const sc = jwtPayload(c.access).scp; return Array.isArray(sc) ? sc : sc ? [sc] : []; } catch { return []; } }
+const hasLoc = c => LOC_SCOPES.every(x => scopesOf(c).includes(x));
+
+/* your location from the EVE login: CCP updates it about every 5 seconds, online status every minute */
+state.esiLoc = new Map();
+let locBusy = false;
+async function pollLocation() {
+  if (locBusy) return; locBusy = true;
+  let changed = false;
+  try {
+    if (!cfg.locEsi && state.esiLoc.size) { state.esiLoc.clear(); changed = true; }
+    const now = Date.now();
+    for (const c of cfg.locEsi ? chars : []) {
+      if (!hasLoc(c)) { if (state.esiLoc.delete(c.id)) changed = true; continue; }
+      const e = state.esiLoc.get(c.id) || { name: c.name, system: null, sysId: null, since: 0, online: null, onlineAt: 0 };
+      try {
+        const auth = { headers: { Authorization: "Bearer " + await accessFor(c) } };
+        if (now - e.onlineAt > 60e3) {
+          const o = await getJSON(`${ESI}/characters/${c.id}/online/?${DS}`, auth, 1);
+          if (e.online !== o.online) changed = true;
+          e.online = o.online; e.onlineAt = now;
+        }
+        if (e.online !== false) {
+          const l = await getJSON(`${ESI}/characters/${c.id}/location/?${DS}`, auth, 1);
+          if (l.solar_system_id !== e.sysId) {
+            await resolveNames([l.solar_system_id]);
+            e.sysId = l.solar_system_id; e.system = nm(l.solar_system_id); e.since = Date.now(); changed = true;
+          }
+        }
+        e.err = null;
+      } catch (err) { e.err = err.message; }
+      state.esiLoc.set(c.id, e);
+    }
+  } finally { locBusy = false; }
+  if (changed) {
+    // nothing loaded yet (first visit): start the map where you are
+    const me = youNow();
+    if (me && !state.target && !state.pinned) { const n = me.system.toUpperCase(); $("#origin").value = n; ls.set("origin", n); start(n, +$("#radius").value); }
+    checkFollow(); computeIntel(); renderIntel(); renderMap(); renderTable(); renderWatch(); renderChars();
+  }
 }
 async function logout(id) {
   const c = chars.find(x => x.id === id); if (!c) return;
@@ -1819,7 +1882,12 @@ async function logout(id) {
   ssoMsg(`Logged out ${c.name}.`); renderChars(); renderNotifs();
 }
 function renderChars() {
-  $("#ssoChars").innerHTML = chars.map(c => `<div class="charrow"><b>${esc(c.name)}</b>${c.err ? ` <span class="note err">${esc(c.err)}</span>` : ""}<button type="button" data-logout="${c.id}">Log out</button></div>`).join("");
+  $("#ssoChars").innerHTML = chars.map(c => {
+    const e = state.esiLoc?.get(c.id);
+    const loc = !hasLoc(c) ? ` <span class="note err">Location not allowed yet.</span> <button type="button" data-relogin>Allow location</button>`
+      : !cfg.locEsi ? "" : e?.online === false ? ` <span class="note">offline</span>` : e?.system ? ` <span class="note">in ${esc(e.system)}</span>` : "";
+    return `<div class="charrow"><b>${esc(c.name)}</b>${loc}${c.err ? ` <span class="note err">${esc(c.err)}</span>` : ""}<button type="button" data-logout="${c.id}">Log out</button></div>`;
+  }).join("");
 }
 
 /* notifications: CCP caches these for about 10 minutes */
@@ -1926,10 +1994,14 @@ $("#ssoCopy").addEventListener("click", () => {
   navigator.clipboard?.writeText(txt).then(() => ssoMsg("Callback URL copied."), () => { getSelection().selectAllChildren($("#ssoCb")); ssoMsg("Press Ctrl+C to copy the selected address."); })
     ?? (getSelection().selectAllChildren($("#ssoCb")), ssoMsg("Press Ctrl+C to copy the selected address."));
 });
-$("#ssoChars").addEventListener("click", e => { const b = e.target.closest("[data-logout]"); if (b) logout(+b.dataset.logout); });
+$("#ssoChars").addEventListener("click", e => {
+  const b = e.target.closest("[data-logout]"); if (b) logout(+b.dataset.logout);
+  if (e.target.closest("[data-relogin]")) ssoLogin(); // logging in again replaces the character with the extra permission
+});
 if (location.protocol === "file:") ssoMsg("To log in, the page must be on a web address (GitHub Pages or http://localhost). The About window explains how.");
 renderChars(); renderNotifs();
 ssoCallback().then(loadNotifs);
+setInterval(pollLocation, 10e3);
 setInterval(loadNotifs, 5 * 60e3);
 
 /* ---------- interaction ---------- */
@@ -1991,6 +2063,9 @@ $("#origin").value = o0; $("#radius").value = r0;
   if (!state.pinned && window.showDirectoryPicker) {
     const h = await kvGet("dir");
     try { if (h && await h.queryPermission({ mode: "read" }) === "granted") { intel.dir = h; startIntel(); if (await followLocation()) return; } } catch {}
+  }
+  if (!state.pinned && chars.some(hasLoc) && cfg.locEsi) {
+    try { await pollLocation(); const me = youNow(); if (me) { const n = me.system.toUpperCase(); $("#origin").value = n; ls.set("origin", n); start(n, r0); return; } } catch {}
   }
   if (o0) start(o0, r0);
   else {
