@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.5
+  Local Intel, version 2.6
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -32,6 +32,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body);
@@ -135,11 +136,8 @@ tr:hover td { background: #141d27; }
 #map .intelring { fill: none; stroke: var(--intel); stroke-width: 2; }
 @media (prefers-reduced-motion: no-preference) { #map .intelring.live { animation: ping 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; } }
 @keyframes ping { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
-.settings > summary { cursor: pointer; font: 600 13px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); list-style: none; }
-.settings > summary::-webkit-details-marker { display: none; }
-.settings > summary::before { content: "+ "; color: var(--accent); }
-.settings[open] > summary::before { content: "\2013  "; }
-.setgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 12px; }
+.settings-unused { cursor: pointer; font: 600 13px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); list-style: none; }
+.setgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .setgrid fieldset { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; margin: 0; display: grid; gap: 8px; align-content: start; min-width: 0; font: 12px var(--mono); color: var(--fg); }
 .setgrid legend { font: 600 11px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 4px; }
 .setgrid label { display: flex; gap: 8px; align-items: center; }
@@ -147,10 +145,22 @@ tr:hover td { background: #141d27; }
 .setgrid button { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 5px 9px; cursor: pointer; }
 .setgrid button:hover { background: var(--accent); color: var(--bg); }
 .note { color: var(--muted); font: 11px var(--mono); }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.phead h2 { margin: 0; }
+.pmin { font: 600 12px var(--mono); background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 9px; cursor: pointer; line-height: 1.4; }
+.pmin:hover { color: var(--accent); border-color: var(--accent); }
+.dock { display: flex; flex-wrap: wrap; gap: 8px; }
+.dock:empty { display: none; }
+.dock button { font: 600 12px var(--display); letter-spacing: .08em; text-transform: uppercase; background: var(--panel); color: var(--accent); border: 1px solid var(--line); border-radius: 18px; padding: 7px 14px; cursor: pointer; }
+.dock button:hover { border-color: var(--accent); }
+.dock button .cnt { font: 500 11px var(--mono); color: var(--hot); margin-left: 6px; letter-spacing: 0; }
+.pinned-note { font: 12px var(--mono); color: var(--sov); }
 .watchbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
 .watchbar h2 { margin: 0; }
 .watchform { display: flex; gap: 8px; flex: 1 1 320px; max-width: 620px; min-width: 0; }
 .watchform input { flex: 1; min-width: 0; font: 13px var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+.wcard .wopen { font: 12px var(--mono); border: 1px solid var(--accent); border-radius: 4px; padding: 3px 9px; }
+.wcard .wopen:hover { background: var(--accent); color: var(--bg); text-decoration: none; }
 .watchform button, .wcard button { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 4px 9px; cursor: pointer; }
 .watchform button:hover, .wcard button:hover { background: var(--accent); color: var(--bg); }
 #watchNote { margin-top: 6px; }
@@ -238,18 +248,6 @@ footer { font: 11px var(--mono); color: var(--muted); }
     </form>
   </header>
 
-  <section class="panel" id="watchPanel">
-    <div class="watchbar">
-      <h2>Watched systems</h2>
-      <form class="watchform" id="watchForm">
-        <input id="watch" aria-label="Systems to watch" placeholder="System names to watch, comma separated" autocomplete="off" spellcheck="false">
-        <button type="submit">Watch</button>
-      </form>
-    </div>
-    <div class="note" id="watchNote">Watch systems anywhere in New Eden, even ones off the map. Kills, intel, gate camps and sov fights there are tracked and can alert you.</div>
-    <div class="watchgrid" id="watchGrid"></div>
-  </section>
-
   <div id="status">Starting…</div>
 
   <div class="summary" id="summary"></div>
@@ -312,8 +310,22 @@ footer { font: 11px var(--mono); color: var(--muted); }
     </div>
   </div>
 
-<details class="panel settings" id="settings">
-    <summary>Alerts and settings</summary>
+  <section class="panel" id="watchPanel">
+    <div class="watchbar">
+      <h2>Watched systems</h2>
+      <form class="watchform" id="watchForm">
+        <input id="watch" aria-label="Systems to watch" placeholder="System names to watch, comma separated" autocomplete="off" spellcheck="false">
+        <button type="submit">Watch</button>
+      </form>
+    </div>
+    <div class="note" id="watchNote">Watch systems anywhere in New Eden, even ones off the map. Kills, intel, gate camps and sov fights there are tracked and can alert you.</div>
+    <div class="watchgrid" id="watchGrid"></div>
+  </section>
+
+  <div class="dock" id="dock" aria-label="Collapsed sections"></div>
+
+  <section class="panel collapsible" id="settings" data-title="Alerts and settings" data-start="closed">
+    <div class="phead"><h2>Alerts and settings</h2></div>
     <div class="setgrid">
       <fieldset>
         <legend>Alerts</legend>
@@ -358,16 +370,16 @@ footer { font: 11px var(--mono); color: var(--muted); }
         <div class="note" id="standNote">Use full names, not tickers.</div>
       </fieldset>
     </div>
-  </details>
+  </section>
 
-<section class="panel" id="notifPanel">
-    <h2>Character notifications</h2>
+<section class="panel collapsible" id="notifPanel" data-title="Character notifications">
+    <div class="phead"><h2>Character notifications</h2></div>
     <div class="note" id="notifNote"></div>
     <div class="feed" id="notifFeed"></div>
   </section>
 
-  <section class="panel">
-    <h2 id="feedtitle">Kills, last 24 hours</h2>
+  <section class="panel collapsible" id="killPanel" data-title="Kills">
+    <div class="phead"><h2 id="feedtitle">Kills, last 24 hours</h2></div>
     <div class="feed" id="feed"><div class="empty">Loading killmails…</div></div>
   </section>
 
@@ -382,7 +394,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.5</span>
+    <span class="ver" id="aboutVer">Version 2.6</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -392,15 +404,16 @@ footer { font: 11px var(--mono); color: var(--muted); }
     <ol>
       <li>Open the page in Chrome or Edge on the computer that runs EVE.</li>
       <li>Type a system name at the top right, choose how many jumps around it to cover (1 to 5) and press <b>Load</b>. Or connect your chat logs folder (see Intel and location) and the page starts in the system you're in.</li>
-      <li>Open <b>Alerts and settings</b>, below the map, to choose what alerts you and how.</li>
+      <li>Press <b>+ Alerts and settings</b>, below the map and the watched systems, to choose what alerts you and how.</li>
     </ol>
     <p>A link like <code>index.html?system=NAME&amp;jumps=3</code> always opens that system. Otherwise the page starts where you are, or in the last system you loaded.</p>
 
     <h3>Watched systems</h3>
     <ul>
-      <li>Type system names into the box at the top, separated by commas, and press <b>Watch</b>. They can be anywhere, on the map or not.</li>
+      <li>The <b>Watched systems</b> panel is below the map. Type system names into its box, separated by commas, and press <b>Watch</b>. They can be anywhere, on the map or not.</li>
       <li>Each card shows kills in the last hour and 24 hours, ship jumps and NPC kills in the last hour, the latest intel that mentions it, how far it is from you, and tags for gate camps, big ships, sov, ESS and wormholes.</li>
-      <li><b>Center map</b> moves the map to that system. <b>Remove</b> stops watching it.</li>
+      <li><b>Open map</b> opens that system's map in a new browser tab. That tab stays on the system: it never follows you or moves to where you are, even with Follow me on. <b>Remove</b> stops watching it.</li>
+      <li>With several tabs open, each alert plays in only one of them.</li>
       <li>With "Always alert on … watched systems" on, any intel, new kill, gate camp or sov fight there alerts you, however far away it is.</li>
       <li>Kills in watched systems also appear in the kill feed, marked "watched".</li>
     </ul>
@@ -421,6 +434,9 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <li>Press <b>Log in with EVE</b> and approve. Repeat for each character you want.</li>
     </ol>
     <p>Notifications update every 5 minutes, but CCP only refreshes them about every 10, so they can be up to 10 minutes behind. Notifications that were already there when you log in don't alert. Your login is saved in this browser only. <b>Log out</b> removes it and cancels it with CCP.</p>
+
+    <h3>Layout</h3>
+    <p>From the top: the summary numbers; the gate map with the systems table and intel beside it; watched systems; then <b>Alerts and settings</b>, <b>Character notifications</b> and <b>Kills</b>. Each of the last three has a <b>–</b> button that collapses it into a small button in a row above them. Press the small button to open it again. The page remembers which are open. A collapsed Character notifications button shows how many attacks arrived in the last hour.</p>
 
     <h3>Gate map</h3>
     <ul>
@@ -495,6 +511,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.6</b> Watched systems moved below the map, and each opens in its own tab that stays on that system. Alerts and settings, Character notifications and Kills collapse into small buttons. With several tabs open, each alert plays only once.</li>
       <li><b>2.5</b> Your location can come from your EVE login, so YOU on the map, follow mode and "jumps from you" work without the chat logs folder.</li>
       <li><b>2.4</b> Catches a callback URL or other text typed into the Client ID box. The official page uses its built-in Client ID instead.</li>
       <li><b>2.3</b> EVE login is ready to use on the official page: its Client ID is built in.</li>
@@ -1179,6 +1196,16 @@ function beep() {
 }
 function fireAlert(key, title, body, speech, force) {
   if (alerted.has(key)) return; alerted.add(key);
+  // with several tabs open (e.g. watched systems), only the first tab to see an alert plays it
+  if (!force) {
+    let shared = {};
+    try { shared = JSON.parse(localStorage.getItem("alertedShared") || "{}") || {}; } catch {}
+    const now = Date.now();
+    if (shared[key] && now - shared[key] < 6 * 36e5) return;
+    shared[key] = now;
+    for (const k of Object.keys(shared)) if (now - shared[k] > 6 * 36e5) delete shared[k];
+    try { localStorage.setItem("alertedShared", JSON.stringify(shared)); } catch {}
+  }
   if (cfg.alSound) beep();
   if (cfg.alDesktop && "Notification" in window && Notification.permission === "granted") {
     try { const n = new Notification(title, { body, tag: key }); n.onclick = () => { window.focus(); n.close(); }; } catch {}
@@ -1294,7 +1321,8 @@ function routeTo(fromName, toId) {
     if (!fromId) { const r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON([fromName])); fromId = r.systems?.[0]?.id; if (fromId) sysIdCache.set(fromName.toUpperCase(), fromId); }
     if (!fromId) { routeV.set(k, null); return null; }
     const route = await getJSON(`${ESI}/route/${fromId}/${toId}/?${DS}`);
-    routeV.set(k, route.length - 1); return route.length - 1;
+    const n = Array.isArray(route) && route.length ? route.length - 1 : null; // no route (e.g. wormhole space): unknown
+    routeV.set(k, n); return n;
   })().catch(() => { routeV.set(k, null); return null; }));
   return { k, p: routeP.get(k) };
 }
@@ -1320,7 +1348,7 @@ async function alertDistAsync(id) {
   return await routeTo(me.system, id).p;
 }
 function checkFollow() {
-  if (!cfg.follow) return;
+  if (!cfg.follow || state.pinned) return; // a tab opened for one system stays on it
   const me = youNow(); if (!me) return;
   const name = me.system.toUpperCase();
   if (state.target === name) return;
@@ -1642,7 +1670,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.5";
+const APP_VERSION = "2.6";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1729,7 +1757,7 @@ function renderWatch() {
       <div class="wh"><span class="wname">${esc(w.name)}</span><span class="sec" style="color:${secColor(w.sec)}">${fmtSec(w.sec)}</span>${chips}</div>
       <div class="wstats">${stat("Kills 1h", k1, true)}${stat("Kills 24h", k24)}${stat("Jumps 1h", w.jumps)}${stat("Rats 1h", w.npc_kills)}</div>
       <div class="wintel${live ? " live" : ""}" title="${rep ? esc(rep.msg) : ""}">${intelTxt}</div>
-      <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><button type="button" data-center="${esc(w.name)}">Center map</button><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
+      <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><a class="wopen" href="${esc(watchTabUrl(w.name))}" target="_blank" rel="noopener" title="Open a map of ${esc(w.name)} in a new tab that stays on it">Open map</a><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
     </div>`;
   }).join("");
 }
@@ -1738,8 +1766,7 @@ $("#watchForm").addEventListener("submit", e => {
   cfg.watch = $("#watch").value.trim(); saveCfg(); loadWatch();
 });
 $("#watchGrid").addEventListener("click", e => {
-  const c = e.target.closest("[data-center]"), u = e.target.closest("[data-unwatch]");
-  if (c) { const n = c.dataset.center.toUpperCase(); $("#origin").value = n; ls.set("origin", n); start(n, +$("#radius").value); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  const u = e.target.closest("[data-unwatch]");
   if (u) { cfg.watch = watchNames().filter(n => n.toLowerCase() !== u.dataset.unwatch.toLowerCase()).join(", "); saveCfg(); loadWatch(); }
 });
 
@@ -1807,7 +1834,7 @@ async function ssoCallback() {
   try { pend = JSON.parse(ls.get("ssoPending", "null")); } catch {}
   ls.set("ssoPending", "null");
   if (!pend || pend.state !== st) return ssoMsg("This login didn't match the request the page sent. Press Log in with EVE again.", true);
-  $("#settings").open = true;
+  expandPanel("settings");
   ssoMsg("Finishing login…");
   try { addChar(await tokenRequest({ grant_type: "authorization_code", code, client_id: cfg.ssoClient, code_verifier: pend.verifier })); }
   catch (e) { ssoMsg("EVE login failed: " + e.message + ". Check that the Client ID and callback URL match your app.", true); }
@@ -1954,7 +1981,7 @@ async function loadNotifs() {
   }
   ls.set("notifSeen", JSON.stringify([...notifSeen].slice(-3000)));
   state.notifAt = Date.now();
-  renderChars(); renderNotifs(); renderMap(); renderTable(); renderWatch();
+  renderChars(); renderNotifs(); renderDock(); renderMap(); renderTable(); renderWatch();
 }
 function notifAlert(x) {
   if (!cfg.alNotif) return;
@@ -2004,6 +2031,35 @@ ssoCallback().then(loadNotifs);
 setInterval(pollLocation, 10e3);
 setInterval(loadNotifs, 5 * 60e3);
 
+/* ---------- sections that collapse into small buttons ---------- */
+const panelState = (() => { try { return JSON.parse(ls.get("panels", "{}")) || {}; } catch { return {}; } })();
+const collapsibles = () => [...document.querySelectorAll(".collapsible")];
+function isClosed(el) { return panelState[el.id] != null ? panelState[el.id] === "closed" : el.dataset.start === "closed"; }
+function renderDock() {
+  $("#dock").innerHTML = collapsibles().filter(isClosed).map(el => {
+    const cnt = el.id === "notifPanel" && state.notifs ? [...state.notifs.values()].filter(x => Date.now() - x.t < 36e5 && notifKind(x.type) === "attack").length : 0;
+    return `<button type="button" data-open="${el.id}" title="Show ${esc(el.dataset.title)}">+ ${esc(el.dataset.title)}${cnt ? `<span class="cnt">${cnt}</span>` : ""}</button>`;
+  }).join("");
+  for (const el of collapsibles()) el.hidden = isClosed(el);
+}
+function expandPanel(id) { panelState[id] = "open"; ls.set("panels", JSON.stringify(panelState)); renderDock(); }
+function collapsePanel(id) { panelState[id] = "closed"; ls.set("panels", JSON.stringify(panelState)); renderDock(); }
+for (const el of collapsibles()) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "pmin"; b.textContent = "–"; b.title = "Collapse to a button"; b.setAttribute("aria-label", `Collapse ${el.dataset.title}`);
+  b.addEventListener("click", () => collapsePanel(el.id));
+  el.querySelector(".phead").appendChild(b);
+}
+$("#dock").addEventListener("click", e => { const b = e.target.closest("[data-open]"); if (b) expandPanel(b.dataset.open); });
+renderDock();
+
+// a watched system opens in its own tab, fixed on that system
+function watchTabUrl(name) {
+  const u = new URL(location.href);
+  u.search = new URLSearchParams({ system: name, jumps: $("#radius").value || "3" }).toString(); u.hash = "";
+  return u.toString();
+}
+
 /* ---------- interaction ---------- */
 function select(id) { state.sel = state.sel === id ? null : id; renderMap(); renderTable(); renderFeed(); }
 $("#map").addEventListener("click", e => { const g = e.target.closest("g[data-id]"); if (g) select(+g.dataset.id); });
@@ -2038,7 +2094,7 @@ async function start(origin, radius) {
     const o = state.systems.get(state.origin);
     state.target = o.name.toUpperCase();
     document.title = state.baseTitle = `${o.name} Local Intel`;
-    $("#title").innerHTML = `${esc(o.name)} Local Intel<small>${esc(o.region || "")}${o.constellationName ? " · " + esc(o.constellationName) : ""} · ${radius}-jump radius · ${state.systems.size} systems</small>`;
+    $("#title").innerHTML = `${esc(o.name)} Local Intel<small>${esc(o.region || "")}${o.constellationName ? " · " + esc(o.constellationName) : ""} · ${radius}-jump radius · ${state.systems.size} systems${state.pinned ? ` · <span class="pinned-note">this tab stays on ${esc(o.name)}</span>` : ""}</small>`;
     setStatus("Loading hourly stats…");
     await loadHourly(); if (gen !== state.gen) return; renderAll();
     loadWormholes().then(() => { if (gen === state.gen) renderAll(); });
@@ -2050,7 +2106,7 @@ async function start(origin, radius) {
   } catch (e) { if (gen === state.gen) setStatus(e.message, true); }
 }
 
-$("#cfg").addEventListener("submit", e => { e.preventDefault(); ls.set("origin", $("#origin").value.trim().toUpperCase()); ls.set("radius", $("#radius").value); start($("#origin").value.trim().toUpperCase(), +$("#radius").value); });
+$("#cfg").addEventListener("submit", e => { e.preventDefault(); if (!state.pinned) { ls.set("origin", $("#origin").value.trim().toUpperCase()); ls.set("radius", $("#radius").value); } start($("#origin").value.trim().toUpperCase(), +$("#radius").value); });
 $("#refresh").addEventListener("click", () => { refreshHourly(); refreshKills(); loadNotifs(); });
 setInterval(() => { if (state.systems.size) renderAll(); }, 30e3); // keep "x m ago", camps and rings fresh
 
