@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.6
+  Local Intel, version 2.7
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -345,6 +345,8 @@ footer { font: 11px var(--mono); color: var(--muted); }
         <legend>Map</legend>
         <label><input type="checkbox" id="follow"> Follow me: re-center the map when I jump</label>
         <label><input type="checkbox" id="locEsi"> Get my location from my EVE login</label>
+        <label>Kills to load per system <select id="killCap"><option value="200">200</option><option value="500">500</option><option value="1000">1,000</option><option value="2000">2,000</option></select></label>
+        <div class="note">Covers up to 24 hours. Busy systems can have thousands of kills a day; higher limits download more data (about 1 to 2 MB per 200 kills).</div>
         <label><input type="checkbox" id="showRats"> Show ratting activity (green glow)</label>
         <label><input type="checkbox" id="showSov"> Show sov timers, sov fights, structure kills and ESS reports</label>
         <label><input type="checkbox" id="showWh"> Show Thera and Turnur wormholes</label>
@@ -394,7 +396,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.6</span>
+    <span class="ver" id="aboutVer">Version 2.7</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -452,7 +454,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
     <h3>Systems table</h3>
     <table>
       <tr><td>Jumps</td><td>Distance from the map's center.</td></tr>
-      <tr><td>Kills 1h, 24h</td><td>From zKillboard, up to 200 per system.</td></tr>
+      <tr><td>Kills 1h, 24h</td><td>From zKillboard, up to 1,000 per system by default (200 to 2,000, set in Alerts and settings → Map). A "+" means the limit was reached, so the real count is higher.</td></tr>
       <tr><td>Ship/pod, Rats, Jumps 1h</td><td>CCP's hourly numbers. They can lag by up to an hour.</td></tr>
       <tr><td>Intel</td><td>Minutes since a report named the system. Green "clr" means the last report said clear.</td></tr>
       <tr><td>Reported</td><td>Latest pilot count from intel and how old it is.</td></tr>
@@ -486,6 +488,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <li>Alert as a sound, a desktop pop-up, spoken words, or any mix. The browser tab also flashes when the page is in the background. <b>Test alert</b> shows what you'll get.</li>
       <li>Optional alerts: new kills and gate camps in range; big ships anywhere on the map; sov fights and structure kills anywhere on the map, and ESS reports in range; anything in watched systems.</li>
       <li><b>Follow me</b> re-centers the map each time you jump.</li>
+      <li><b>Kills to load per system</b>: 200, 500, 1,000 (default) or 2,000, covering up to 24 hours. Higher limits download more in busy systems.</li>
       <li>Switches for ratting glow, sov and ESS, and Thera and Turnur wormholes.</li>
       <li><b>Standings</b>: full alliance or corp names (not tickers) for friendly and hostile. You can hide friendly losses from the kill feed.</li>
     </ul>
@@ -511,6 +514,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.7</b> Kill limit raised from 200 to 1,000 per system by default, adjustable from 200 to 2,000. A count that hit the limit shows a "+".</li>
       <li><b>2.6</b> Watched systems moved below the map, and each opens in its own tab that stays on that system. Alerts and settings, Character notifications and Kills collapse into small buttons. With several tabs open, each alert plays only once.</li>
       <li><b>2.5</b> Your location can come from your EVE login, so YOU on the map, follow mode and "jumps from you" work without the chat logs folder.</li>
       <li><b>2.4</b> Catches a callback URL or other text typed into the Client ID box. The official page uses its built-in Client ID instead.</li>
@@ -540,7 +544,7 @@ const $ = s => document.querySelector(s);
 
 const state = {
   origin: null, radius: 3, systems: new Map(), // id -> {id,name,sec,dist,neighbors:Set,...}
-  kills: new Map(), oldKills: new Set(), // ids already known to be older than 24 h  // killmail_id -> {id,time,sys,ship,victim,corp,alliance,value}
+  kills: new Map(), oldKills: new Set(), capped: new Set(), // ids already known to be older than 24 h  // killmail_id -> {id,time,sys,ship,victim,corp,alliance,value}
   names: new Map(), sel: null, sort: { k: "k24", dir: -1 },
   gen: 0, target: null, primedFor: null, lastLoadedFor: null, watch: new Map(), watchSeen: new Set(), hourly: null, camps: new Map(), campKeys: new Set(), wh: [], friends: new Set(), enemies: new Set()
 };
@@ -677,7 +681,7 @@ async function loadHourly() {
 }
 
 const DAY = 864e5;
-const MAX_KILLS_PER_SYSTEM = 200; // zKillboard returns up to 200 per request
+// how many kills per system to read (Alerts and settings → Map); zKillboard sends 200 per page
 async function loadKills() {
   const ids = [...new Set([...state.systems.keys(), ...state.watch.keys()])];
   const cutoff = Date.now() - DAY;
@@ -687,34 +691,47 @@ async function loadKills() {
   let done = 0;
   // zKillboard asks for gentle use: 2 at a time.
   await pool(ids, 2, async sid => {
-    let list = [];
-    try { list = await getJSON(`${ZKB}/kills/systemID/${sid}/`, { headers: { "Accept": "application/json" } }); } catch { list = []; }
-    if (!Array.isArray(list)) list = [];
-    // newest first; read details 10 at a time and stop at the first killmail older than 24 h
-    const items = list.slice(0, MAX_KILLS_PER_SYSTEM);
-    for (let i = 0; i < items.length; i += 10) {
-      let reachedOld = false;
-      const fresh = items.slice(i, i + 10).filter(z => {
-        if (state.oldKills.has(z.killmail_id)) { reachedOld = true; return false; }
-        return !state.kills.has(z.killmail_id);
-      });
-      await pool(fresh, 10, async z => {
-        // zKillboard now sends the whole killmail; older responses only had the id and hash
-        let km = z.killmail_time && z.victim ? z : null;
-        if (!km) { try { km = await getJSON(`${ESI}/killmails/${z.killmail_id}/${z.zkb.hash}/?${DS}`); } catch { return; } }
-        const t = Date.parse(km.killmail_time);
-        if (t < cutoff) { state.oldKills.add(z.killmail_id); reachedOld = true; return; }
-        const k = {
-          id: z.killmail_id, time: t, sys: km.solar_system_id, ship: km.victim.ship_type_id,
-          victim: km.victim.character_id, corp: km.victim.corporation_id, alliance: km.victim.alliance_id,
-          attackers: km.attackers.length, value: z.zkb.totalValue, npc: z.zkb.npc, loc: z.zkb.locationID,
-          atk: [...new Set(km.attackers.flatMap(a => [a.alliance_id, a.corporation_id]).filter(Boolean))],
-          atkShips: [...new Set(km.attackers.map(a => a.ship_type_id).filter(Boolean))]
-        };
-        state.kills.set(z.killmail_id, k); added.push(k);
-      });
-      if (reachedOld) break;
+    // zKillboard pages hold 200 kills each, newest first, with the full killmail included.
+    // Read pages until a kill is older than 24 h, a kill is one we already have, or the limit is reached.
+    const cap = Math.max(200, +cfg.killCap || 1000);
+    const thisRun = new Set(); // pages overlap by a kill or two, so repeats from this same read don't count as "known"
+    let seen = 0, ended = false, reason = null; // why reading stopped: "old", "known" or "short"
+    for (let page = 1; page <= Math.ceil(cap / 200) && !ended; page++) {
+      let list = [];
+      try { list = await getJSON(`${ZKB}/kills/systemID/${sid}/${page > 1 ? `page/${page}/` : ""}`, { headers: { "Accept": "application/json" } }); } catch { list = []; }
+      if (!Array.isArray(list) || !list.length) { ended = true; reason = "short"; break; }
+      const items = list.slice(0, cap - seen);
+      seen += items.length;
+      for (let i = 0; i < items.length; i += 10) {
+        let stop = false;
+        const fresh = items.slice(i, i + 10).filter(z => {
+          if (state.oldKills.has(z.killmail_id)) { stop = "old"; return false; }
+          if (thisRun.has(z.killmail_id)) return false;
+          if (state.kills.has(z.killmail_id)) { stop = stop || "known"; return false; } // everything after this was loaded on an earlier refresh
+          return true;
+        });
+        await pool(fresh, 10, async z => {
+          // zKillboard now sends the whole killmail; older responses only had the id and hash
+          let km = z.killmail_time && z.victim ? z : null;
+          if (!km) { try { km = await getJSON(`${ESI}/killmails/${z.killmail_id}/${z.zkb.hash}/?${DS}`); } catch { return; } }
+          const t = Date.parse(km.killmail_time);
+          if (t < cutoff) { state.oldKills.add(z.killmail_id); stop = "old"; return; }
+          const k = {
+            id: z.killmail_id, time: t, sys: km.solar_system_id, ship: km.victim.ship_type_id,
+            victim: km.victim.character_id, corp: km.victim.corporation_id, alliance: km.victim.alliance_id,
+            attackers: km.attackers.length, value: z.zkb.totalValue, npc: z.zkb.npc, loc: z.zkb.locationID,
+            atk: [...new Set(km.attackers.flatMap(a => [a.alliance_id, a.corporation_id]).filter(Boolean))],
+            atkShips: [...new Set(km.attackers.map(a => a.ship_type_id).filter(Boolean))]
+          };
+          state.kills.set(z.killmail_id, k); added.push(k); thisRun.add(z.killmail_id);
+        });
+        if (stop) { ended = true; reason = stop; break; }
+      }
+      // pages aren't always exactly 200 long, so only an empty page means there are no more
     }
+    // hit the limit while kills were still inside the last 24 hours: the count is a lower bound
+    if (!ended) state.capped.add(sid);
+    else if (reason === "old" || reason === "short") state.capped.delete(sid);
     done++; if (done % 4 === 0 || done === ids.length) setStatus(`Reading killmails: ${done}/${ids.length} systems…`);
   });
   for (const [id, k] of state.kills) if (k.time < cutoff) { state.kills.delete(id); state.oldKills.add(id); }
@@ -847,7 +864,7 @@ function renderTable() {
       <td title="${esc(s.sov ? "Sov: " + s.sov : "No sov holder")}"><a class="sys" href="https://zkillboard.com/system/${s.id}/" target="_blank" rel="noopener">${esc(s.name)}</a>${s.here?.length ? `<span class="you" title="${esc(s.here.join(", "))}">YOU</span>` : ""}<span class="sec" style="color:${secColor(s.sec)}">${fmtSec(s.sec)}</span>${sysChips(s, whBySys)}</td>
       <td>${s.dist}</td>
       <td>${num(s.k1, s.k1 ? "h" : "")}</td>
-      <td>${num(s.k24, s.k24 ? "w" : "")}</td>
+      <td title="${state.capped.has(s.id) ? esc(`More than ${s.k24} kills: the limit of ${cfg.killCap} per system was reached. Change it in Alerts and settings.`) : ""}">${s.k24 ? `<span class="pill w">${s.k24}${state.capped.has(s.id) ? "+" : ""}</span>` : num(0)}</td>
       <td>${s.ship_kills || s.pod_kills ? `${s.ship_kills}/${s.pod_kills}` : `<span class="zero">0</span>`}</td>
       <td>${num(s.npc_kills)}</td>
       <td>${num(s.jumps)}</td>
@@ -1148,7 +1165,7 @@ $("#intelReconnect").addEventListener("click", async () => {
 $("#intelChannels").addEventListener("change", () => { ls.set("intelChannels", $("#intelChannels").value); if (intel.dir) startIntel(); });
 
 /* ---------- settings ---------- */
-const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, locEsi: true, intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
+const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, locEsi: true, killCap: "1000", intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
 let cfg;
 try { cfg = { ...SETTINGS_DEFAULT, ...JSON.parse(ls.get("settings", "{}")) }; } catch { cfg = { ...SETTINGS_DEFAULT }; }
 if (ls.get("settings", null) == null && ls.get("intelAlert", null) != null) cfg.alRange = ls.get("intelAlert"); // older version's setting
@@ -1167,6 +1184,7 @@ function onSetting(k) {
   if (k === "hideFriendly") renderFeed();
   if (k === "showRats") { $("#ratLegend").hidden = !cfg.showRats; renderMap(); }
   if (k === "watch") loadWatch();
+  if (k === "killCap") refreshKills();
   if (k === "locEsi") { pollLocation(); renderChars(); }
   if (k === "showSov") { $("#sovLegend").hidden = !cfg.showSov; loadSov().then(renderAll); }
   if (k === "alRange" || k === "alFrom" || k === "intelFilter") renderIntel();
@@ -1670,7 +1688,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.6";
+const APP_VERSION = "2.7";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1755,7 +1773,7 @@ function renderWatch() {
     const where = [here ? "you are here" : yd != null ? `${yd}j from you` : "", onMap ? `on map, ${onMap.dist}j` : "off map"].filter(Boolean).join(" · ");
     return `<div class="wcard${k1 || camp ? " hot" : live ? " intel" : ""}">
       <div class="wh"><span class="wname">${esc(w.name)}</span><span class="sec" style="color:${secColor(w.sec)}">${fmtSec(w.sec)}</span>${chips}</div>
-      <div class="wstats">${stat("Kills 1h", k1, true)}${stat("Kills 24h", k24)}${stat("Jumps 1h", w.jumps)}${stat("Rats 1h", w.npc_kills)}</div>
+      <div class="wstats">${stat("Kills 1h", k1, true)}${stat("Kills 24h", k24 && state.capped.has(w.id) ? k24 + "+" : k24)}${stat("Jumps 1h", w.jumps)}${stat("Rats 1h", w.npc_kills)}</div>
       <div class="wintel${live ? " live" : ""}" title="${rep ? esc(rep.msg) : ""}">${intelTxt}</div>
       <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><a class="wopen" href="${esc(watchTabUrl(w.name))}" target="_blank" rel="noopener" title="Open a map of ${esc(w.name)} in a new tab that stays on it">Open map</a><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
     </div>`;
