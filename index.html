@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.7
+  Local Intel, version 2.8
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -155,6 +155,24 @@ tr:hover td { background: #141d27; }
 .dock button:hover { border-color: var(--accent); }
 .dock button .cnt { font: 500 11px var(--mono); color: var(--hot); margin-left: 6px; letter-spacing: 0; }
 .pinned-note { font: 12px var(--mono); color: var(--sov); }
+.selbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: -2px 0 8px; font: 12px var(--mono); }
+.selbar b { font: 600 14px var(--display); }
+.selbar button, .routeform button, .routeacts button, .mini { font: 12px var(--mono); background: var(--bg); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 3px 9px; cursor: pointer; }
+.selbar button:hover, .routeform button:hover, .routeacts button:hover, .mini:hover { background: var(--accent); color: var(--bg); }
+.mini { font-size: 10px; padding: 0 5px; margin-left: 4px; }
+.routeform { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font: 12px var(--mono); color: var(--muted); }
+.routeform input, .routeform select { font: 13px var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; margin-left: 4px; }
+.routeform input { width: 11em; }
+.routeopts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 10px 0 6px; font: 12px var(--mono); color: var(--muted); }
+.routeopts label { display: flex; gap: 5px; align-items: center; color: var(--fg); }
+.routelist { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 10px 0; font: 12px var(--mono); }
+.routelist li { display: flex; align-items: baseline; gap: 4px; border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; background: var(--bg); }
+.routelist .rn { color: var(--muted); font-size: 10px; }
+.routeacts { display: flex; gap: 8px; }
+#map .routeline { stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; opacity: .85; }
+#map .tag.fleet { fill: var(--ok); }
+#toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 50; max-width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--fg); border: 1px solid var(--accent); border-radius: 6px; padding: 10px 14px; font: 13px var(--body); box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+#toast.err { border-color: var(--hot); }
 .watchbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
 .watchbar h2 { margin: 0; }
 .watchform { display: flex; gap: 8px; flex: 1 1 320px; max-width: 620px; min-width: 0; }
@@ -255,6 +273,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
   <div class="grid">
     <section class="panel">
       <h2>Gate map</h2>
+      <div class="selbar" id="selbar" hidden></div>
       <svg id="map" viewBox="0 0 600 600" role="img" aria-label="Systems arranged in rings by jump distance"></svg>
       <div class="legend">
         <span><i style="background:var(--hot)"></i>kill in last hour</span>
@@ -324,6 +343,24 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
   <div class="dock" id="dock" aria-label="Collapsed sections"></div>
 
+  <section class="panel collapsible" id="routePanel" data-title="Route planner" data-start="closed">
+    <div class="phead"><h2>Route planner</h2></div>
+    <form class="routeform" id="routeForm">
+      <label>From <input id="routeFrom" placeholder="Where I am" autocomplete="off" spellcheck="false"></label>
+      <label>To <input id="routeTo" placeholder="System name" autocomplete="off" spellcheck="false"></label>
+      <label>Prefer <select id="routeFlag"><option value="shortest">Shortest</option><option value="secure">Safer (high-sec)</option><option value="insecure">Less secure</option></select></label>
+      <button type="submit">Find safe route</button>
+    </form>
+    <div class="routeopts">Avoid:
+      <label><input type="checkbox" id="avCamps"> gate camps</label>
+      <label><input type="checkbox" id="avKills"> kills in the last hour</label>
+      <label><input type="checkbox" id="avIntel"> hostiles in intel (15 min)</label>
+    </div>
+    <div class="note" id="routeNote">Plans a route that avoids systems the page knows are dangerous, then sends it to your autopilot.</div>
+    <ol class="routelist" id="routeList"></ol>
+    <div class="routeacts" id="routeActions" hidden><button type="button" id="routeSend">Send to autopilot</button><button type="button" id="routeClear">Clear</button></div>
+  </section>
+
   <section class="panel collapsible" id="settings" data-title="Alerts and settings" data-start="closed">
     <div class="phead"><h2>Alerts and settings</h2></div>
     <div class="setgrid">
@@ -360,6 +397,9 @@ footer { font: 11px var(--mono); color: var(--muted); }
         <div class="note">Callback URL for your app: <code id="ssoCb"></code> <button type="button" id="ssoCopy">Copy</button></div>
         <div><button type="button" id="ssoLogin">Log in with EVE</button></div>
         <div class="charlist" id="ssoChars"></div>
+        <label><input type="checkbox" id="stdEsi"> Use my EVE contacts (personal, corp, alliance) as standings</label>
+        <div class="note" id="stdNote"></div>
+        <label><input type="checkbox" id="shipAware"> Ship-aware alerts: in a hauler, barge or freighter, alert one jump further and always on gate camps</label>
         <label><input type="checkbox" id="alNotif"> Alert on attacks, reinforcements, sov and war notifications</label>
         <label><input type="checkbox" id="alNotifWarn"> Also alert on fuel, low power and service warnings</label>
         <div class="note" id="ssoNote"></div>
@@ -393,10 +433,11 @@ footer { font: 11px var(--mono); color: var(--muted); }
   </footer>
 </div>
 
+<div id="toast" role="status" hidden></div>
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.7</span>
+    <span class="ver" id="aboutVer">Version 2.8</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -431,7 +472,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
           <li><b>Your own computer</b>: in the folder with the file, run <code>python -m http.server 8000</code> and open <code>http://localhost:8000/</code>.</li>
         </ul>
       </li>
-      <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permissions <code>esi-characters.read_notifications.v1</code>, <code>esi-location.read_location.v1</code> and <code>esi-location.read_online.v1</code>, and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
+      <li>Go to <code>developers.eveonline.com</code>, sign in, and create an application. Choose the type that allows authentication and API access, add the permissions the page asks for (notifications, location, online status, ship type, fatigue, waypoints, open windows, contacts for character, corp and alliance, and fleet), and set the callback URL to the address shown under <b>EVE login</b> in Alerts and settings (the Copy button copies it).</li>
       <li>Copy the app's <b>Client ID</b> into the Client ID box. The page doesn't need the secret key, so never paste the secret anywhere.</li>
       <li>Press <b>Log in with EVE</b> and approve. Repeat for each character you want.</li>
     </ol>
@@ -439,6 +480,18 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Layout</h3>
     <p>From the top: the summary numbers; the gate map with the systems table and intel beside it; watched systems; then <b>Alerts and settings</b>, <b>Character notifications</b> and <b>Kills</b>. Each of the last three has a <b>–</b> button that collapses it into a small button in a row above them. Press the small button to open it again. The page remembers which are open. A collapsed Character notifications button shows how many attacks arrived in the last hour.</p>
+
+    <h3>Using your EVE login</h3>
+    <p>These need extra permissions. A character logged in before version 2.8 shows <b>Allow new features</b> under EVE login: press it and approve once. Actions use the character you're flying (your latest jump), or another logged-in character that has the permission.</p>
+    <ul>
+      <li><b>Set destination / Add waypoint</b>: click a system on the map (or in the systems table) and use the bar above the map, or press <b>Destination</b> on a watched-system card. Your autopilot in EVE updates straight away.</li>
+      <li><b>Show in EVE</b> opens the selected system's info window in the game. The <b>in EVE</b> button next to a pilot named in intel opens that pilot's info window.</li>
+      <li><b>Route planner</b> (collapsed below the watched systems, or <b>Safe route</b> in the map bar): from where you are (or a system you type) to a destination. It asks EVE for a route that avoids systems with gate camps, kills in the last hour or hostiles reported in intel in the last 15 minutes (each can be switched off), and compares it with the shortest route. The route is drawn on the map. <b>Send to autopilot</b> puts a waypoint in every system so the autopilot follows that exact path. Only systems on the map and watched systems are checked for danger.</li>
+      <li><b>Standings from contacts</b>: your personal, corp and alliance contacts are read every 30 minutes. Positive standing counts as friendly and negative as hostile, and your own corp and alliance are always friendly. Names typed under Standings are added on top.</li>
+      <li><b>Fleet</b>: when a logged-in character is fleet boss, each member appears on the map as <b>F</b> and a count (and FLEET in the table), checked every 30 seconds. Hover the fleet line under the intel panel for the list. Other fleet members can't see positions; that's EVE's rule.</li>
+      <li><b>Ship-aware alerts</b>: the ship you're flying shows next to your location. In a hauler, transport, freighter, mining barge, exhumer, mining frigate, Rorqual or industrial command ship, alerts reach one jump further and gate camps always alert.</li>
+      <li><b>Jump fatigue</b> shows as FATIGUE with the time left next to your location, checked every 5 minutes and after each jump.</li>
+    </ul>
 
     <h3>Gate map</h3>
     <ul>
@@ -448,7 +501,8 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <li>A purple ring is a system named in intel in the last 15 minutes. It pulses for the first 3 minutes. A number in brackets is the reported pilot count.</li>
       <li>A dashed ring and YOU mark where your character is.</li>
       <li>Labels: <b>CAMP</b> possible gate camp, big ship type (e.g. DICTOR), <b>VULN</b> sov hub vulnerable, <b>FIGHT</b> sov fight, <b>ESS</b> ESS activity reported, <b>ATTACKED</b> a structure attack from your notifications, <b>TH</b>/<b>TU</b> Thera or Turnur wormhole.</li>
-      <li>Click a system to show only its kills in the kill feed. Click it again to show all.</li>
+      <li>Click a system to show only its kills in the kill feed, and a bar above the map with Set destination, Add waypoint, Safe route, Show in EVE and Open in new tab. Click it again to clear.</li>
+      <li>A thick blue line is the route from the Route planner. <b>F</b> and a number is how many of your fleet are there.</li>
     </ul>
 
     <h3>Systems table</h3>
@@ -514,6 +568,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.8</b> With the EVE login: set your destination or waypoints from the page, a route planner that avoids camps, kills and reported hostiles and sends the route to your autopilot, standings from your EVE contacts, fleet members on the map, ship-aware alerts, jump fatigue, and opening pilots and systems in EVE.</li>
       <li><b>2.7</b> Kill limit raised from 200 to 1,000 per system by default, adjustable from 200 to 2,000. A count that hit the limit shows a "+".</li>
       <li><b>2.6</b> Watched systems moved below the map, and each opens in its own tab that stays on that system. Alerts and settings, Character notifications and Kills collapse into small buttons. With several tabs open, each alert plays only once.</li>
       <li><b>2.5</b> Your location can come from your EVE login, so YOU on the map, follow mode and "jumps from you" work without the chat logs folder.</li>
@@ -794,7 +849,7 @@ function layout() {
 }
 
 function renderMap() {
-  const attacked = attackedSystems();
+  const attacked = attackedSystems(), fleetBy = fleetBySys();
   const svg = $("#map"), pos = layout(), whBySys = whMap(), sovBySys = sovMap(), fightBySys = fightMap();
   const maxJ = Math.max(1, ...[...state.systems.values()].map(s => s.jumps || 0));
   let h = `<defs><radialGradient id="ratGlow"><stop offset="0%" stop-color="#57c47a" stop-opacity=".55"/><stop offset="100%" stop-color="#57c47a" stop-opacity="0"/></radialGradient></defs>`;
@@ -814,6 +869,11 @@ function renderMap() {
     const key = s.id < n ? s.id + "-" + n : n + "-" + s.id; if (seen.has(key)) continue; seen.add(key);
     const a = pos.get(s.id), b = pos.get(n);
     h += `<line class="edge" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
+  }
+  // planned route through systems on the map
+  if (state.route) for (let i = 1; i < state.route.length; i++) {
+    const a = pos.get(state.route[i - 1]), b = pos.get(state.route[i]); if (!a || !b) continue;
+    h += `<line class="routeline" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
   }
   for (const s of state.systems.values()) {
     const p = pos.get(s.id);
@@ -841,11 +901,13 @@ function renderMap() {
     if (attacked.has(s.id)) tags += `<tspan class="tag camp"> ATTACKED</tspan>`;
     {
     }
+    const fl = fleetBy.get(s.id); if (fl) tags += `<tspan class="tag fleet"> F${fl.length}</tspan>`;
     const whs = whBySys.get(s.id); if (whs) tags += `<tspan class="tag wh"> ${whs.map(w => w.out_system_name === "Thera" ? "TH" : "TU").join(" ")}</tspan>`;
     if (cfg.showRats && s.npc_kills) h += `<text class="ratlbl" x="${p.x.toFixed(1)}" y="${(p.y + (below ? r + 21 : -r - 14)).toFixed(1)}" text-anchor="middle">${s.npc_kills} rats/h</text>`;
     h += `<text x="${p.x.toFixed(1)}" y="${(p.y + (below ? r + 11 : -r - 4)).toFixed(1)}" text-anchor="middle" font-weight="${s.id === state.origin ? 600 : 400}">${esc(s.name)}${s.k1 ? " ·" + s.k1 : ""}${cnt}${tags}</text></g>`;
   }
   svg.innerHTML = h;
+  renderSelbar();
 }
 
 function renderTable() {
@@ -1071,9 +1133,16 @@ function renderYou() {
   const rows = presences().map(p => {
     const s = [...state.systems.values()].find(x => x.name.toUpperCase() === p.system.toUpperCase());
     const where = s && origin ? `${s.dist} jump${s.dist === 1 ? "" : "s"} from ${esc(origin.name)}` : "outside this map";
-    return `<div>${esc(p.name)}: <b>${esc(p.system)}</b> · ${where}${cfg.follow ? " · following" : ""} <span class="note">from ${p.src}</span></div>`;
+    const e = [...(state.esiLoc || new Map()).values()].find(x => x.name.toLowerCase() === p.name.toLowerCase());
+    const ship = e?.ship ? ` · ${esc(nm(e.ship.type))}${e.ship.name ? ` “${esc(e.ship.name)}”` : ""}${SOFT[typeGroup[e.ship.type]] && cfg.shipAware ? ` <span class="chip big" title="Alerts reach one jump further and always include gate camps">${esc(SOFT[typeGroup[e.ship.type]].toUpperCase())}</span>` : ""}` : "";
+    const fat = e?.fatigue > Date.now() ? ` · <span class="chip flag" title="Jump fatigue ends ${fmtEve(e.fatigue)}">FATIGUE ${dur(e.fatigue - Date.now())}</span>` : "";
+    return `<div>${esc(p.name)}: <b>${esc(p.system)}</b> · ${where}${ship}${fat}${cfg.follow ? " · following" : ""} <span class="note">from ${p.src}</span></div>`;
   });
-  for (const e of (state.esiLoc || new Map()).values()) if (e.online === false) rows.push(`<div>${esc(e.name)}: <span class="note">not logged in to EVE</span></div>`);
+  for (const e of (state.esiLoc || new Map()).values()) if (e.online === false) rows.push(`<div>${esc(e.name)}: <span class="note">not logged in to EVE</span>${e.fatigue > Date.now() ? ` · <span class="chip flag">FATIGUE ${dur(e.fatigue - Date.now())}</span>` : ""}</div>`);
+  const f = state.fleet;
+  if (f) rows.push(f.boss
+    ? `<div title="${esc(f.members.map(m => `${nm(m.character_id)}: ${nm(m.solar_system_id)}, ${nm(m.ship_type_id)}`).join("\n"))}">Fleet: <b>${f.members.length}</b> members in ${new Set(f.members.map(m => m.solar_system_id)).size} systems <span class="note">(${esc(f.char)} is fleet boss; hover for the list)</span></div>`
+    : `<div>Fleet: ${esc(f.char)} is in a fleet <span class="note">(only the fleet boss can see where members are)</span></div>`);
   el.innerHTML = rows.join("");
 }
 function intelCell(s) {
@@ -1165,7 +1234,7 @@ $("#intelReconnect").addEventListener("click", async () => {
 $("#intelChannels").addEventListener("change", () => { ls.set("intelChannels", $("#intelChannels").value); if (intel.dir) startIntel(); });
 
 /* ---------- settings ---------- */
-const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, locEsi: true, killCap: "1000", intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
+const SETTINGS_DEFAULT = { alRange: "1", alFrom: "you", alSound: true, alDesktop: false, alSpeak: false, alKills: false, alBig: true, follow: false, locEsi: true, killCap: "1000", intelFilter: "all", showRats: true, showSov: true, alSov: true, watch: "", alWatch: true, ssoClient: "", stdEsi: true, shipAware: true, routeFlag: "shortest", avCamps: true, avKills: true, avIntel: true, alNotif: true, alNotifWarn: true, showWh: true, friends: "", enemies: "", hideFriendly: false };
 let cfg;
 try { cfg = { ...SETTINGS_DEFAULT, ...JSON.parse(ls.get("settings", "{}")) }; } catch { cfg = { ...SETTINGS_DEFAULT }; }
 if (ls.get("settings", null) == null && ls.get("intelAlert", null) != null) cfg.alRange = ls.get("intelAlert"); // older version's setting
@@ -1185,6 +1254,8 @@ function onSetting(k) {
   if (k === "showRats") { $("#ratLegend").hidden = !cfg.showRats; renderMap(); }
   if (k === "watch") loadWatch();
   if (k === "killCap") refreshKills();
+  if (k === "stdEsi") loadContacts();
+  if (k === "shipAware") renderIntel();
   if (k === "locEsi") { pollLocation(); renderChars(); }
   if (k === "showSov") { $("#sovLegend").hidden = !cfg.showSov; loadSov().then(renderAll); }
   if (k === "alRange" || k === "alFrom" || k === "intelFilter") renderIntel();
@@ -1257,14 +1328,14 @@ async function maybeAlert(r) {
     const s0 = state.systems.get(ids[0]);
     return fireAlert("b" + r.t + r.msg, `${big.join(", ")} reported in ${s0.name}`, `${r.who}: ${r.msg}`, `${big.join(", ")}, ${say(s0.name)}`);
   }
-  const range = +cfg.alRange; if (range < 0) return;
+  const range = effRange(); if (range < 0) return;
   let best = null;
   for (const id of ids) { const d = await alertDistAsync(id); if (d != null && (!best || d < best.d)) best = { id, d }; }
   if (!best || best.d > range) return;
   const s = state.systems.get(best.id), where = `${best.d} jump${best.d === 1 ? "" : "s"}${fromYouTxt()}`;
   if (isEss(r.msg) && cfg.showSov && cfg.alSov)
     return fireAlert("i" + r.t + r.msg, `ESS activity ${where}: ${s.name}`, `${r.who}: ${r.msg}`, `E S S activity, ${best.d} jump${best.d === 1 ? "" : "s"}, ${say(s.name)}`);
-  fireAlert("i" + r.t + r.msg, `Hostile ${where}: ${s.name}${n ? ", " + n + " pilots" : ""}`, `${r.who}: ${r.msg}`,
+  fireAlert("i" + r.t + r.msg, `Hostile ${where}: ${s.name}${n ? ", " + n + " pilots" : ""}${shipNote()}`, `${r.who}: ${r.msg}`,
     `Hostile, ${best.d} jump${best.d === 1 ? "" : "s"}, ${say(s.name)}${n ? ", " + n + " pilots" : ""}`);
 }
 
@@ -1284,8 +1355,8 @@ function killAlerts(added, primed, wPrimed) {
     if (st && cfg.showSov && cfg.alSov) { fireAlert("ks" + k.id, `Structure destroyed in ${s.name}`, `${nm(k.ship)}${k.alliance || k.corp ? " owned by " + (nm(k.alliance) || nm(k.corp)) : ""}`, `Structure destroyed, ${say(s.name)}`); continue; }
     const big = killBig(k);
     if (big.length && cfg.alBig) { fireAlert("kb" + k.id, `${big.join(", ")} on a killmail in ${s.name}`, `${nm(k.ship)} destroyed in ${s.name}`, `${big.join(", ")}, ${say(s.name)}`); continue; }
-    if (!cfg.alKills || +cfg.alRange < 0) continue;
-    const d = alertDist(k.sys); if (d == null || d > +cfg.alRange) continue;
+    if (!cfg.alKills || effRange() < 0) continue;
+    const d = alertDist(k.sys); if (d == null || d > effRange()) continue;
     const owner = nm(k.alliance) || nm(k.corp);
     fireAlert("k" + k.id, `Kill ${d} jump${d === 1 ? "" : "s"}${fromYouTxt()}: ${s.name}`, `${nm(k.ship)} destroyed${owner ? " (" + owner + ")" : ""}`, `Kill, ${d} jumps, ${say(s.name)}`);
   }
@@ -1301,10 +1372,11 @@ function campAlerts() {
       const w = state.watch.get(c.sys);
       if (w && !state.watchPrimedPrev?.has(c.sys)) continue; // just added to the watchlist: the camp was already there
       if (w && cfg.alWatch) { fireAlert("c" + key + ":" + Math.floor(c.first / 18e5), `Possible gate camp in watched system ${w.name}`, `${c.n} kills on the ${nm(c.dest)} gate in 30 minutes`, `Gate camp, watched system, ${say(w.name)}`); continue; }
-      if (!cfg.alKills || +cfg.alRange < 0 || !state.systems.has(c.sys)) continue;
-      const d = alertDist(c.sys); if (d == null || d > +cfg.alRange) continue;
+      // gate camps always alert in a hauler or other soft ship, even with kill alerts off
+      if (!(cfg.alKills || softShip()) || effRange() < 0 || !state.systems.has(c.sys)) continue;
+      const d = alertDist(c.sys); if (d == null || d > effRange()) continue;
       const s = state.systems.get(c.sys);
-      fireAlert("c" + key + ":" + Math.floor(c.first / 18e5), `Possible gate camp ${d} jump${d === 1 ? "" : "s"}${fromYouTxt()}: ${s.name}`, `${c.n} kills on the ${nm(c.dest)} gate in 30 minutes`, `Gate camp, ${say(s.name)}, ${say(nm(c.dest))} gate`);
+      fireAlert("c" + key + ":" + Math.floor(c.first / 18e5), `Possible gate camp ${d} jump${d === 1 ? "" : "s"}${fromYouTxt()}: ${s.name}${shipNote()}`, `${c.n} kills on the ${nm(c.dest)} gate in 30 minutes`, `Gate camp, ${say(s.name)}, ${say(nm(c.dest))} gate`);
     }
   }
   state.campKeys = keys;
@@ -1446,6 +1518,8 @@ function whSummary() {
 function sysChips(s, whBySys) {
   let h = "";
   const c = state.camps.get(s.id);
+  const fl = fleetBySys().get(s.id);
+  if (fl) h += `<span class="chip win" title="${esc(fl.map(m => nm(m.character_id)).join(", "))}">FLEET ${fl.length}</span>`;
   if (attackedSystems().has(s.id)) h += `<span class="chip camp" title="A character's notification reported an attack here in the last hour">ATTACKED</span>`;
   if (c) h += `<span class="chip camp" title="${esc(`${c.n} kills on the ${nm(c.dest)} gate in the last 30 minutes${c.pods ? ", " + c.pods + " pods" : ""}`)}">CAMP</span>`;
   const big = bigTags(s);
@@ -1475,22 +1549,22 @@ async function resolveStandings() {
   const note = $("#standNote");
   const split = v => (v || "").split(",").map(x => x.trim()).filter(Boolean);
   const f = split(cfg.friends), e = split(cfg.enemies);
-  if (!f.length && !e.length) { state.friends = new Set(); state.enemies = new Set(); note.textContent = "Use full names, not tickers."; note.className = "note"; return; }
+  if (!f.length && !e.length) { state.manFriends = new Set(); state.manEnemies = new Set(); mergeStandings(); note.textContent = "Use full names, not tickers."; note.className = "note"; return; }
   try {
     const r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON([...f, ...e]));
     const byName = new Map([...(r.alliances || []), ...(r.corporations || [])].map(x => [x.name.toLowerCase(), x.id]));
     const miss = [];
     const ids = list => new Set(list.map(n => { const id = byName.get(n.toLowerCase()); if (!id) miss.push(n); return id; }).filter(Boolean));
-    state.friends = ids(f); state.enemies = ids(e);
-    note.textContent = miss.length ? `Not found: ${miss.join(", ")}. Use the full alliance or corp name, not the ticker.` : `${state.friends.size} friendly, ${state.enemies.size} hostile.`;
+    state.manFriends = ids(f); state.manEnemies = ids(e); mergeStandings();
+    note.textContent = miss.length ? `Not found: ${miss.join(", ")}. Use the full alliance or corp name, not the ticker.` : `Typed in: ${state.manFriends.size} friendly, ${state.manEnemies.size} hostile.`;
     note.className = "note" + (miss.length ? " err" : "");
   } catch { note.textContent = "Couldn't look up those names right now."; note.className = "note err"; }
 }
 function standingChip(k) {
   const fr = state.friends, en = state.enemies;
-  if (fr.has(k.alliance) || fr.has(k.corp)) return `<span class="chip loss" style="margin:0 6px 0 0">LOSS</span>`;
+  if (fr.has(k.victim) || fr.has(k.alliance) || fr.has(k.corp)) return `<span class="chip loss" style="margin:0 6px 0 0">LOSS</span>`;
   if (k.atk?.some(id => fr.has(id))) return `<span class="chip win" style="margin:0 6px 0 0">KILL</span>`;
-  if (en.has(k.alliance) || en.has(k.corp)) return `<span class="chip win" style="margin:0 6px 0 0">HOSTILE DOWN</span>`;
+  if (en.has(k.victim) || en.has(k.alliance) || en.has(k.corp)) return `<span class="chip win" style="margin:0 6px 0 0">HOSTILE DOWN</span>`;
   return "";
 }
 
@@ -1585,10 +1659,10 @@ function pilotLine(id) {
   if (!i) return `<div>${link} · looking up…</div>`;
   const org = [i.corp ? nm(i.corp) : "", i.alliance ? nm(i.alliance) : ""].filter(Boolean).join(" · ");
   const fr = state.friends, en = state.enemies;
-  const st = fr.has(i.alliance) || fr.has(i.corp) ? `<span class="chip blue">FRIENDLY</span>` : en.has(i.alliance) || en.has(i.corp) ? `<span class="chip red">HOSTILE</span>` : "";
+  const st = fr.has(id) || fr.has(i.alliance) || fr.has(i.corp) ? `<span class="chip blue">FRIENDLY</span>` : en.has(id) || en.has(i.alliance) || en.has(i.corp) ? `<span class="chip red">HOSTILE</span>` : "";
   const stats = i.zkb ? `danger ${i.danger ?? 0}% · solo ${100 - (i.gang ?? 100)}% · ${i.kills} kills` : "no zKillboard history";
   const flags = (i.cloaky ? `<span class="chip flag">CLOAKY HUNTER?</span>` : "") + (i.cyno ? `<span class="chip flag">CYNO ALT?</span>` : "");
-  return `<div>${link}${st}${org ? " · " + esc(org) : ""} · ${stats}${i.ships?.length ? " · flies " + esc(i.ships.join(", ")) : ""}${flags}</div>`;
+  return `<div>${link} <button type="button" class="mini" data-act="info" data-id="${id}" data-name="${esc(nm(id))}" title="Open this pilot's info window in EVE">in EVE</button>${st}${org ? " · " + esc(org) : ""} · ${stats}${i.ships?.length ? " · flies " + esc(i.ships.join(", ")) : ""}${flags}</div>`;
 }
 resolveStandings();
 $("#ratLegend").hidden = !cfg.showRats;
@@ -1688,7 +1762,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.7";
+const APP_VERSION = "2.8";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1775,7 +1849,7 @@ function renderWatch() {
       <div class="wh"><span class="wname">${esc(w.name)}</span><span class="sec" style="color:${secColor(w.sec)}">${fmtSec(w.sec)}</span>${chips}</div>
       <div class="wstats">${stat("Kills 1h", k1, true)}${stat("Kills 24h", k24 && state.capped.has(w.id) ? k24 + "+" : k24)}${stat("Jumps 1h", w.jumps)}${stat("Rats 1h", w.npc_kills)}</div>
       <div class="wintel${live ? " live" : ""}" title="${rep ? esc(rep.msg) : ""}">${intelTxt}</div>
-      <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><a class="wopen" href="${esc(watchTabUrl(w.name))}" target="_blank" rel="noopener" title="Open a map of ${esc(w.name)} in a new tab that stays on it">Open map</a><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
+      <div class="wfoot"><span>${where}</span><span><a href="https://zkillboard.com/system/${w.id}/" target="_blank" rel="noopener">zKill</a><button type="button" data-act="dest" data-id="${w.id}" data-name="${esc(w.name)}" title="Set as your in-game destination">Destination</button><a class="wopen" href="${esc(watchTabUrl(w.name))}" target="_blank" rel="noopener" title="Open a map of ${esc(w.name)} in a new tab that stays on it">Open map</a><button type="button" data-unwatch="${esc(w.name)}">Remove</button></span></div>
     </div>`;
   }).join("");
 }
@@ -1798,7 +1872,7 @@ loadWatch();
 /* ---------- EVE login (EVE SSO with PKCE, no secret) and character notifications ---------- */
 const SSO = "https://login.eveonline.com/v2/oauth";
 const LOC_SCOPES = ["esi-location.read_location.v1", "esi-location.read_online.v1"];
-const SCOPES = ["esi-characters.read_notifications.v1", ...LOC_SCOPES].join(" ");
+const SCOPES = ["esi-characters.read_notifications.v1", ...LOC_SCOPES, "esi-ui.write_waypoint.v1", "esi-ui.open_window.v1", "esi-characters.read_contacts.v1", "esi-corporations.read_contacts.v1", "esi-alliances.read_contacts.v1", "esi-fleets.read_fleet.v1", "esi-location.read_ship_type.v1", "esi-characters.read_fatigue.v1"].join(" ");
 const callbackUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
 // the official copy of this page has its own EVE app; copies hosted elsewhere need their own Client ID
 const HOME_URL = "https://quietstatic01.github.io/Eve-Intel/", HOME_CLIENT = "398b1ea0b5714cc38e240a3cbf836079";
@@ -1852,7 +1926,7 @@ async function ssoCallback() {
   try { pend = JSON.parse(ls.get("ssoPending", "null")); } catch {}
   ls.set("ssoPending", "null");
   if (!pend || pend.state !== st) return ssoMsg("This login didn't match the request the page sent. Press Log in with EVE again.", true);
-  expandPanel("settings");
+  setTimeout(() => expandPanel("settings")); // the collapsing code loads after this block
   ssoMsg("Finishing login…");
   try { addChar(await tokenRequest({ grant_type: "authorization_code", code, client_id: cfg.ssoClient, code_verifier: pend.verifier })); }
   catch (e) { ssoMsg("EVE login failed: " + e.message + ". Check that the Client ID and callback URL match your app.", true); }
@@ -1863,7 +1937,7 @@ function addChar(tok) {
   chars = chars.filter(x => x.id !== id).concat({ id, name: p.name, access: tok.access_token, refresh: tok.refresh_token, exp: Date.now() + (tok.expires_in || 1199) * 1000 });
   saveChars(); state.names.set(id, p.name);
   ssoMsg(`Logged in as ${p.name}.`);
-  renderChars(); loadNotifs(); pollLocation();
+  renderChars(); loadNotifs(); pollLocation(); loadContacts(); loadFleet();
 }
 // one refresh at a time per character: EVE replaces the refresh token each time, so two at once would break the login
 const refreshing = new Map();
@@ -1902,10 +1976,12 @@ async function pollLocation() {
         }
         if (e.online !== false) {
           const l = await getJSON(`${ESI}/characters/${c.id}/location/?${DS}`, auth, 1);
+          let moved = false;
           if (l.solar_system_id !== e.sysId) {
             await resolveNames([l.solar_system_id]);
-            e.sysId = l.solar_system_id; e.system = nm(l.solar_system_id); e.since = Date.now(); changed = true;
+            e.sysId = l.solar_system_id; e.system = nm(l.solar_system_id); e.since = Date.now(); changed = moved = true;
           }
+          if (await pollShipAndFatigue(c, e, moved)) changed = true;
         }
         e.err = null;
       } catch (err) { e.err = err.message; }
@@ -1929,8 +2005,9 @@ async function logout(id) {
 function renderChars() {
   $("#ssoChars").innerHTML = chars.map(c => {
     const e = state.esiLoc?.get(c.id);
-    const loc = !hasLoc(c) ? ` <span class="note err">Location not allowed yet.</span> <button type="button" data-relogin>Allow location</button>`
-      : !cfg.locEsi ? "" : e?.online === false ? ` <span class="note">offline</span>` : e?.system ? ` <span class="note">in ${esc(e.system)}</span>` : "";
+    const miss = missingScopes(c);
+    const loc = (!hasLoc(c) ? "" : !cfg.locEsi ? "" : e?.online === false ? ` <span class="note">offline</span>` : e?.system ? ` <span class="note">in ${esc(e.system)}${e.ship ? ", " + esc(nm(e.ship.type)) : ""}</span>` : "")
+      + (miss.length ? ` <span class="note err">${miss.length} new feature permission${miss.length === 1 ? "" : "s"} to approve.</span> <button type="button" data-relogin>Allow new features</button>` : "");
     return `<div class="charrow"><b>${esc(c.name)}</b>${loc}${c.err ? ` <span class="note err">${esc(c.err)}</span>` : ""}<button type="button" data-logout="${c.id}">Log out</button></div>`;
   }).join("");
 }
@@ -2048,6 +2125,244 @@ renderChars(); renderNotifs();
 ssoCallback().then(loadNotifs);
 setInterval(pollLocation, 10e3);
 setInterval(loadNotifs, 5 * 60e3);
+
+/* ---------- things the EVE login can do: autopilot, route planner, contacts, fleet, ship, fatigue, info windows ---------- */
+const hasScope = (c, sc) => scopesOf(c).includes(sc);
+// the character to act for: the one you're flying (latest jump) if it has the permission, else any that has it
+function actingChar(scope) {
+  const me = youNow();
+  return (me && chars.find(c => c.name.toLowerCase() === me.name.toLowerCase() && hasScope(c, scope))) || chars.find(c => hasScope(c, scope)) || null;
+}
+function needPermission() {
+  toast(chars.length ? "That needs a new permission. Press Allow new features under EVE login, then try again." : "Log in with EVE first (Alerts and settings → EVE login).", true);
+  expandPanel("settings");
+}
+async function esiCall(c, method, path, params) {
+  const u = new URL(ESI + path); u.searchParams.set("datasource", "tranquility");
+  for (const [k, v] of Object.entries(params || {})) for (const x of [].concat(v)) u.searchParams.append(k, x);
+  const r = await fetch(u, { method, headers: { Authorization: "Bearer " + await accessFor(c) } }); // no retries: a repeated POST would add a waypoint twice
+  if (!r.ok) { let m = ""; try { m = (await r.json()).error; } catch {} throw new Error(m || "HTTP " + r.status); }
+  return r.status === 204 ? null : r.json();
+}
+let toastTimer = null;
+function toast(msg, err) {
+  const t = $("#toast"); t.textContent = msg; t.className = err ? "err" : ""; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+}
+async function idOf(name) {
+  const n = name.trim().toUpperCase();
+  for (const s of [...state.systems.values(), ...state.watch.values()]) if (s.name.toUpperCase() === n) return { id: s.id, name: s.name };
+  if (sysIdCache.has(n)) return { id: sysIdCache.get(n), name: nm(sysIdCache.get(n)) || name };
+  const r = await getJSON(`${ESI}/universe/ids/?${DS}`, POSTJSON([name.trim()]));
+  const s = r.systems?.[0]; if (!s) return null;
+  sysIdCache.set(n, s.id); state.names.set(s.id, s.name);
+  return { id: s.id, name: s.name };
+}
+
+/* 1. autopilot and in-game windows */
+async function setDestination(id, name, add) {
+  const c = actingChar("esi-ui.write_waypoint.v1"); if (!c) return needPermission();
+  try {
+    await esiCall(c, "POST", "/ui/autopilot/waypoint/", { add_to_beginning: false, clear_other_waypoints: !add, destination_id: id });
+    toast(`${add ? "Waypoint added" : "Destination set"}: ${name} (${c.name})`);
+  } catch (e) { toast(`Couldn't set the ${add ? "waypoint" : "destination"}: ${e.message}. Is ${c.name} logged in to EVE?`, true); }
+}
+async function openInfo(id, label) {
+  const c = actingChar("esi-ui.open_window.v1"); if (!c) return needPermission();
+  try { await esiCall(c, "POST", "/ui/openwindow/information/", { target_id: id }); toast(`Opened ${label} in EVE (${c.name})`); }
+  catch (e) { toast(`Couldn't open it in EVE: ${e.message}. Is ${c.name} logged in to EVE?`, true); }
+}
+function renderSelbar() {
+  const bar = $("#selbar"), s = state.sel && state.systems.get(state.sel);
+  bar.hidden = !s;
+  if (!s) return;
+  bar.innerHTML = `<b>${esc(s.name)}</b><span class="sec" style="color:${secColor(s.sec)}">${fmtSec(s.sec)}</span>
+    <button type="button" data-act="dest" data-id="${s.id}" data-name="${esc(s.name)}">Set destination</button>
+    <button type="button" data-act="wp" data-id="${s.id}" data-name="${esc(s.name)}">Add waypoint</button>
+    <button type="button" data-act="route" data-name="${esc(s.name)}">Safe route</button>
+    <button type="button" data-act="info" data-id="${s.id}" data-name="${esc(s.name)}">Show in EVE</button>
+    <a href="${esc(watchTabUrl(s.name))}" target="_blank" rel="noopener">Open in new tab</a>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = +b.dataset.id, name = b.dataset.name;
+  if (b.dataset.act === "dest") setDestination(id, name, false);
+  if (b.dataset.act === "wp") setDestination(id, name, true);
+  if (b.dataset.act === "info") openInfo(id, name);
+  if (b.dataset.act === "route") { $("#routeTo").value = name; expandPanel("routePanel"); findRoute(); $("#routePanel").scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+
+/* 2. safe route: avoid systems the page knows are dangerous right now */
+state.route = null;
+function dangerSystems() {
+  const out = new Map(), now = Date.now(), add = (id, why) => { if (!out.has(id)) out.set(id, new Set()); out.get(id).add(why); };
+  if (cfg.avCamps) for (const id of state.camps.keys()) add(id, "gate camp");
+  if (cfg.avKills) for (const k of state.kills.values()) if (!k.npc && now - k.time < 36e5) add(k.sys, "kills in the last hour");
+  if (cfg.avIntel) for (const r of intel.reports) if (now - r.t < 15 * 60e3 && !isClear(r.msg)) for (const id of [...matchSystems(r.msg), ...matchWatch(r.msg)]) add(id, "hostiles reported");
+  return out;
+}
+async function routeIds(from, to, flag, avoid) {
+  const u = new URL(`${ESI}/route/${from}/${to}/`); u.searchParams.set("datasource", "tranquility"); u.searchParams.set("flag", flag);
+  for (const a of avoid) u.searchParams.append("avoid", a);
+  const r = await fetch(u); if (r.status === 404) return null;
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+const secCache = (() => { try { return JSON.parse(ls.get("secs", "{}")) || {}; } catch { return {}; } })();
+async function secsOf(ids) {
+  const need = ids.filter(id => secCache[id] == null && !state.systems.has(id) && !state.watch.has(id));
+  await pool(need, 6, async id => { try { secCache[id] = (await getJSON(`${ESI}/universe/systems/${id}/?${DS}`)).security_status; } catch {} });
+  if (need.length) ls.set("secs", JSON.stringify(secCache));
+  return id => (state.systems.get(id) || state.watch.get(id))?.sec ?? secCache[id];
+}
+async function findRoute() {
+  const note = $("#routeNote"), list = $("#routeList");
+  const say2 = (m, err) => { note.textContent = m; note.className = "note" + (err ? " err" : ""); };
+  const toName = $("#routeTo").value.trim(); if (!toName) return say2("Type a destination system.", true);
+  const fromName = $("#routeFrom").value.trim() || youNow()?.system;
+  if (!fromName) return say2("I don't know where you are. Type a starting system, or log in with EVE / connect chat logs.", true);
+  say2("Finding a route…"); list.innerHTML = ""; $("#routeActions").hidden = true;
+  try {
+    const [from, to] = await Promise.all([idOf(fromName), idOf(toName)]);
+    if (!from) return say2(`No system named "${fromName}".`, true);
+    if (!to) return say2(`No system named "${toName}".`, true);
+    const danger = dangerSystems();
+    const avoid = [...danger.keys()].filter(id => id !== from.id && id !== to.id);
+    const flag = cfg.routeFlag || "shortest";
+    const [plain, safe] = await Promise.all([routeIds(from.id, to.id, flag, []), routeIds(from.id, to.id, flag, avoid)]);
+    if (!plain) return say2(`There's no gate route from ${from.name} to ${to.name}.`, true);
+    const route = safe || plain;
+    await resolveNames(route);
+    const sec = await secsOf(route);
+    const avoidedOnPlain = plain.filter(id => danger.has(id) && !route.includes(id));
+    const stillRisky = route.filter(id => danger.has(id));
+    state.route = route;
+    let msg = safe
+      ? `${route.length - 1} jumps from ${from.name} to ${to.name}` + (safe.length > plain.length ? ` (the shortest is ${plain.length - 1}).` : ". The shortest route is already clear.")
+      : `No route avoids every dangerous system, so this is the normal route: ${plain.length - 1} jumps.`;
+    if (avoidedOnPlain.length) msg += ` Avoids ${avoidedOnPlain.map(id => `${nm(id)} (${[...danger.get(id)].join(", ")})`).join("; ")}.`;
+    if (stillRisky.length) msg += ` Still passes ${stillRisky.map(id => `${nm(id)} (${[...danger.get(id)].join(", ")})`).join("; ")}.`;
+    msg += " Only the map and watched systems are checked for danger.";
+    say2(msg, !safe || stillRisky.length > 0);
+    list.innerHTML = route.map((id, i) => {
+      const sc = sec(id), d = danger.get(id);
+      return `<li><span class="rn">${i}</span><b>${esc(nm(id))}</b>${sc != null ? `<span class="sec" style="color:${secColor(sc)}">${fmtSec(sc)}</span>` : ""}${d ? [...d].map(w => `<span class="chip camp">${esc(w.toUpperCase())}</span>`).join("") : ""}</li>`;
+    }).join("");
+    $("#routeActions").hidden = false;
+    renderMap();
+  } catch (e) { say2("Couldn't get a route from EVE right now: " + e.message, true); }
+}
+async function sendRoute() {
+  const route = state.route; if (!route || route.length < 2) return;
+  const c = actingChar("esi-ui.write_waypoint.v1"); if (!c) return needPermission();
+  // a waypoint in every system makes the autopilot follow this exact path
+  const btn = $("#routeSend"); btn.disabled = true;
+  try {
+    for (let i = 1; i < route.length; i++) {
+      toast(`Sending to autopilot: ${i}/${route.length - 1}…`);
+      await esiCall(c, "POST", "/ui/autopilot/waypoint/", { add_to_beginning: false, clear_other_waypoints: i === 1, destination_id: route[i] });
+    }
+    toast(`Route sent to ${c.name}'s autopilot: ${route.length - 1} jumps.`);
+  } catch (e) { toast("Couldn't send the route: " + e.message + `. Is ${c.name} logged in to EVE?`, true); }
+  btn.disabled = false;
+}
+$("#routeForm").addEventListener("submit", e => { e.preventDefault(); findRoute(); });
+$("#routeSend").addEventListener("click", sendRoute);
+$("#routeClear").addEventListener("click", () => { state.route = null; $("#routeList").innerHTML = ""; $("#routeNote").textContent = ""; $("#routeActions").hidden = true; renderMap(); });
+
+/* 3. standings from EVE contacts (personal, corp, alliance) */
+state.esiFriends = new Set(); state.esiEnemies = new Set(); state.manFriends ||= new Set(); state.manEnemies ||= new Set();
+function mergeStandings() { // typed-in lists can arrive before the contacts code has run, so every set may be missing
+  state.friends = new Set([...(state.manFriends || []), ...(state.esiFriends || [])]);
+  state.enemies = new Set([...(state.manEnemies || []), ...(state.esiEnemies || [])].filter(id => !state.friends.has(id)));
+}
+async function loadContacts() {
+  const note = $("#stdNote");
+  if (!cfg.stdEsi || !chars.length) { state.esiFriends = new Set(); state.esiEnemies = new Set(); mergeStandings(); note.textContent = ""; return; }
+  const fr = new Set(), en = new Set(), from = [];
+  for (const c of chars) {
+    let info = {};
+    try { info = await getJSON(`${ESI}/characters/${c.id}/?${DS}`); } catch {}
+    fr.add(c.id); if (info.corporation_id) fr.add(info.corporation_id); if (info.alliance_id) fr.add(info.alliance_id); // your own side is always friendly
+    const lists = [];
+    if (hasScope(c, "esi-characters.read_contacts.v1")) lists.push([`/characters/${c.id}/contacts/`, "personal"]);
+    if (info.corporation_id && hasScope(c, "esi-corporations.read_contacts.v1")) lists.push([`/corporations/${info.corporation_id}/contacts/`, "corp"]);
+    if (info.alliance_id && hasScope(c, "esi-alliances.read_contacts.v1")) lists.push([`/alliances/${info.alliance_id}/contacts/`, "alliance"]);
+    for (const [path, label] of lists) {
+      let got = 0;
+      for (let page = 1; page <= 20; page++) {
+        let list; try { list = await esiCall(c, "GET", path, { page }); } catch { break; }
+        if (!Array.isArray(list) || !list.length) break;
+        for (const x of list) { if (x.standing > 0) fr.add(x.contact_id); else if (x.standing < 0) en.add(x.contact_id); }
+        got += list.length;
+      }
+      if (got && !from.includes(label)) from.push(label);
+    }
+  }
+  state.esiFriends = fr; state.esiEnemies = en; mergeStandings();
+  note.textContent = `From your EVE contacts${from.length ? " (" + from.join(", ") + ")" : ""}: ${fr.size} friendly, ${en.size} hostile.` + (chars.some(c => !hasScope(c, "esi-characters.read_contacts.v1")) ? " Press Allow new features to include contact lists." : "");
+  note.className = "note";
+  renderFeed(); renderIntel();
+}
+
+/* 5. fleet members on the map (only the fleet boss can see the member list) */
+state.fleet = null;
+async function loadFleet() {
+  let found = null;
+  for (const c of chars) {
+    if (!hasScope(c, "esi-fleets.read_fleet.v1")) continue;
+    let f; try { f = await esiCall(c, "GET", `/characters/${c.id}/fleet/`); } catch { continue; } // not in a fleet
+    try {
+      const members = await esiCall(c, "GET", `/fleets/${f.fleet_id}/members/`);
+      await resolveNames(members.flatMap(m => [m.character_id, m.solar_system_id, m.ship_type_id]));
+      found = { boss: true, char: c.name, members };
+    } catch { found = { boss: false, char: c.name, role: f.role }; }
+    break;
+  }
+  const before = JSON.stringify(state.fleet);
+  state.fleet = found;
+  if (JSON.stringify(found) !== before) { renderYou(); renderMap(); renderTable(); }
+}
+function fleetBySys() {
+  const m = new Map();
+  for (const x of state.fleet?.members || []) (m.get(x.solar_system_id) || m.set(x.solar_system_id, []).get(x.solar_system_id)).push(x);
+  return m;
+}
+
+/* 6. ship-aware alerts and 7. jump fatigue */
+var SOFT = { 28: "hauler", 380: "deep space transport", 1202: "blockade runner", 513: "freighter", 902: "jump freighter", 463: "mining barge", 543: "exhumer", 1283: "mining frigate", 883: "Rorqual", 941: "industrial command ship" };
+function myShip() { const me = youNow(); if (!me) return null; for (const e of state.esiLoc.values()) if (e.name.toLowerCase() === me.name.toLowerCase()) return e.ship || null; return null; }
+function softShip() { const s = cfg.shipAware && myShip(); return s ? SOFT[typeGroup[s.type]] || null : null; }
+function effRange() { const r = +cfg.alRange; return r < 0 ? r : r + (softShip() ? 1 : 0); }
+const shipNote = () => softShip() ? ` (you're in a ${softShip()})` : "";
+async function pollShipAndFatigue(c, e, changedSystem) {
+  const now = Date.now(); let changed = false;
+  if (hasScope(c, "esi-location.read_ship_type.v1") && (changedSystem || now - (e.shipAt || 0) > 30e3)) {
+    try {
+      const s = await esiCall(c, "GET", `/characters/${c.id}/ship/`);
+      e.shipAt = now;
+      if (!e.ship || e.ship.type !== s.ship_type_id || e.ship.name !== s.ship_name) { await loadGroups([s.ship_type_id]); await resolveNames([s.ship_type_id]); e.ship = { type: s.ship_type_id, name: s.ship_name }; changed = true; }
+    } catch {}
+  }
+  if (hasScope(c, "esi-characters.read_fatigue.v1") && (changedSystem || now - (e.fatigueAt || 0) > 5 * 60e3)) {
+    try {
+      const f = await esiCall(c, "GET", `/characters/${c.id}/fatigue/`);
+      e.fatigueAt = now;
+      const end = f.jump_fatigue_expire_date ? Date.parse(f.jump_fatigue_expire_date) : 0;
+      if (end !== e.fatigue) { e.fatigue = end; changed = true; }
+    } catch {}
+  }
+  return changed;
+}
+
+/* new permissions for these features */
+const FEATURE_SCOPES = ["esi-ui.write_waypoint.v1", "esi-ui.open_window.v1", "esi-characters.read_contacts.v1", "esi-corporations.read_contacts.v1", "esi-alliances.read_contacts.v1", "esi-fleets.read_fleet.v1", "esi-location.read_ship_type.v1", "esi-characters.read_fatigue.v1"];
+function missingScopes(c) { return SCOPES.split(" ").filter(x => !scopesOf(c).includes(x)); } // a declaration: renderChars runs before this block
+
+loadContacts();
+setInterval(loadContacts, 30 * 60e3);
+loadFleet();
+setInterval(loadFleet, 30e3);
 
 /* ---------- sections that collapse into small buttons ---------- */
 const panelState = (() => { try { return JSON.parse(ls.get("panels", "{}")) || {}; } catch { return {}; } })();
