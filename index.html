@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.3
+  Local Intel, version 2.4
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -381,7 +381,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.3</span>
+    <span class="ver" id="aboutVer">Version 2.4</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -492,6 +492,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.4</b> Catches a callback URL or other text typed into the Client ID box. The official page uses its built-in Client ID instead.</li>
       <li><b>2.3</b> EVE login is ready to use on the official page: its Client ID is built in.</li>
       <li><b>2.2</b> Kills load much faster: zKillboard now sends full killmails, so the page no longer fetches each one separately. Checked against live data. Removed the last region name from the page.</li>
       <li><b>2.1</b> EVE login and character notifications, with alerts and ATTACKED tags.</li>
@@ -1625,7 +1626,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.3";
+const APP_VERSION = "2.4";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1739,7 +1740,9 @@ const SCOPES = "esi-characters.read_notifications.v1";
 const callbackUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
 // the official copy of this page has its own EVE app; copies hosted elsewhere need their own Client ID
 const HOME_URL = "https://quietstatic01.github.io/Eve-Intel/", HOME_CLIENT = "398b1ea0b5714cc38e240a3cbf836079";
-if (!cfg.ssoClient && callbackUrl() === HOME_URL) { cfg.ssoClient = HOME_CLIENT; $("#ssoClient").value = HOME_CLIENT; }
+// EVE Client IDs are 32 hexadecimal characters; anything else (such as a pasted callback URL) is a mistake
+const validClient = v => /^[0-9a-f]{32}$/i.test((v || "").trim());
+if (!validClient(cfg.ssoClient) && callbackUrl() === HOME_URL) { cfg.ssoClient = HOME_CLIENT; $("#ssoClient").value = HOME_CLIENT; saveCfg(); }
 let chars = [];
 try { chars = JSON.parse(ls.get("chars", "[]")) || []; } catch {}
 const saveChars = () => ls.set("chars", JSON.stringify(chars));
@@ -1758,8 +1761,10 @@ function ssoMsg(msg, err) { const n = $("#ssoNote"); n.textContent = msg; n.clas
 const fmtEve = ms => new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " EVE";
 
 async function ssoLogin() {
+  if (!validClient(cfg.ssoClient) && callbackUrl() === HOME_URL) { cfg.ssoClient = HOME_CLIENT; $("#ssoClient").value = HOME_CLIENT; saveCfg(); }
   const cid = (cfg.ssoClient || "").trim();
   if (!cid) return ssoMsg("Paste your app's Client ID first. The About window explains how to get one.", true);
+  if (!validClient(cid)) return ssoMsg("That isn't a Client ID. It should be 32 letters and numbers, like 398b1ea0b5714cc38e240a3cbf836079, from your app's page on developers.eveonline.com. The callback URL goes in the app, not in this box.", true);
   if (location.protocol === "file:") return ssoMsg("EVE login needs the page on a web address, not a file opened from your disk. Put it on GitHub Pages or run it at http://localhost (see About).", true);
   if (!window.crypto?.subtle) return ssoMsg("This browser can't do the secure login here. Use an https:// address or http://localhost.", true);
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
