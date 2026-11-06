@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Local Intel, version 2.10
+  Local Intel, version 2.11
   MAINTAINERS: with every change, bump APP_VERSION in the script and update the About window
   (#about: the instructions and the version history) so it describes the page as it now is.
 -->
@@ -455,7 +455,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 <dialog class="about" id="about" aria-labelledby="aboutTitle">
   <div class="abouthead">
     <h2 id="aboutTitle">Local Intel</h2>
-    <span class="ver" id="aboutVer">Version 2.10</span>
+    <span class="ver" id="aboutVer">Version 2.11</span>
     <button type="button" id="aboutClose">Close</button>
   </div>
   <div class="aboutbody">
@@ -518,6 +518,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
       <li>Green glow is ratting: NPC kills in the last hour. The label shows rats per hour.</li>
       <li>A purple ring is a system named in intel in the last 15 minutes. It pulses for the first 3 minutes. A number in brackets is the reported pilot count.</li>
       <li>A dashed ring and YOU mark where your character is.</li>
+      <li>Sov fights come from two places. CCP's public list only shows a fight once a structure has been reinforced. Your characters' notifications fill the gap: <b>ENTOSIS</b> (someone started entosising, shown for 90 minutes), <b>REINFORCED</b> (with the time the command nodes appear), <b>NODES</b> (command nodes are up) and <b>LOST</b>. These show in the Sov fights box even for systems off the map, marked "notification".</li>
       <li>Labels: <b>CAMP</b> possible gate camp, big ship type (e.g. DICTOR), <b>VULN</b> sov hub vulnerable, <b>FIGHT</b> sov fight, <b>ESS</b> ESS activity reported, <b>ATTACKED</b> a structure attack from your notifications, <b>TH</b>/<b>TU</b> Thera or Turnur wormhole.</li>
       <li>Click a system to show only its kills in the kill feed, and a bar above the map with Set destination, Add waypoint, Safe route, Show in EVE and Open in new tab. Click it again to clear.</li>
       <li>A thick blue line is the route from the Route planner. <b>F</b> and a number is how many of your fleet are there.</li>
@@ -586,6 +587,7 @@ footer { font: 11px var(--mono); color: var(--muted); }
 
     <h3>Version history</h3>
     <ul class="hist">
+      <li><b>2.11</b> Sov fights also come from your characters' notifications: entosis started, structure reinforced (with the node timer), command nodes up and structure lost, including systems off the map.</li>
       <li><b>2.10</b> Watched-system cards are a little wider and their buttons sit on one tidy row below the distance, instead of squeezing beside it.</li>
       <li><b>2.9</b> Thera/Turnur connections and sov fights share one row under the summary numbers, and light up when something is in range. Sov fights under way pulse red.</li>
       <li><b>2.8</b> With the EVE login: set your destination or waypoints from the page, a route planner that avoids camps, kills and reported hostiles and sends the route to your autopilot, standings from your EVE contacts, fleet members on the map, ship-aware alerts, jump fatigue, and opening pilots and systems in EVE.</li>
@@ -869,7 +871,7 @@ function layout() {
 }
 
 function renderMap() {
-  const attacked = attackedSystems(), fleetBy = fleetBySys();
+  const attacked = attackedSystems(), fleetBy = fleetBySys(), notifSov = cfg.showSov ? notifSovEvents() : new Map();
   const svg = $("#map"), pos = layout(), whBySys = whMap(), sovBySys = sovMap(), fightBySys = fightMap();
   const maxJ = Math.max(1, ...[...state.systems.values()].map(s => s.jumps || 0));
   let h = `<defs><radialGradient id="ratGlow"><stop offset="0%" stop-color="#57c47a" stop-opacity=".55"/><stop offset="100%" stop-color="#57c47a" stop-opacity="0"/></radialGradient></defs>`;
@@ -915,6 +917,7 @@ function renderMap() {
     const big = bigTags(s); if (big.length) tags += `<tspan class="tag big"> ${esc(big[0].toUpperCase())}${big.length > 1 ? "+" : ""}</tspan>`;
     if (cfg.showSov) {
       if (fightBySys.get(s.id)) tags += `<tspan class="tag sov"> FIGHT</tspan>`;
+      else if (notifSov.get(s.id)) tags += `<tspan class="tag sov"> ${notifSov.get(s.id).kind}</tspan>`;
       else if (sovBySys.get(s.id)?.vuln) tags += `<tspan class="tag sov"> VULN</tspan>`;
       if (s.essI) tags += `<tspan class="tag ess"> ESS</tspan>`;
     }
@@ -1728,7 +1731,8 @@ function fightMap() {
 function sovCell(s, sovBySys) {
   const e = sovBySys.get(s.id), now = Date.now();
   const c = cfg.showSov && state.campaigns.find(x => x.solar_system_id === s.id);
-  let h = "";
+  const ne = cfg.showSov && !c && notifSovEvents().get(s.id);
+  let h = ne ? `<span class="chip sov" title="From your notifications">${esc(ne.kind)}</span>` : "";
   if (e) {
     const tip = e.list.map(x => `${nm(x.structure_type_id)} · ${nm(x.alliance_id)} · ADM ${(x.vulnerability_occupancy_level || 0).toFixed(1)}` +
       (x.vulnerable_start_time ? ` · vulnerable ${new Date(x.vulnerable_start_time).toISOString().slice(11, 16)}–${new Date(x.vulnerable_end_time).toISOString().slice(11, 16)} EVE` : "")).join("\n");
@@ -1743,15 +1747,41 @@ function sovCell(s, sovBySys) {
   }
   return h;
 }
+/* Sov events from your characters' notifications. CCP's public campaign list only shows a fight once a
+   structure has been reinforced, so an entosis that has just started appears here first. */
+const FILETIME_EPOCH_MS = 11644473600000; // EVE notification times count 100 ns ticks from 1601
+function notifSovEvents() {
+  const out = new Map(), now = Date.now();
+  if (!state.notifs) return out;
+  for (const x of [...state.notifs.values()].sort((a, b) => a.t - b.t)) {
+    const sys = sysOf(x); if (!sys) continue;
+    let ev = null;
+    if (/EntosisCaptureStarted/i.test(x.type) && now - x.t < 90 * 60e3) ev = { kind: "ENTOSIS", text: "entosis started", live: true };
+    else if (/SovCommandNodeEventStarted/i.test(x.type) && now - x.t < 3 * 36e5) ev = { kind: "NODES", text: "command nodes are up", live: true };
+    else if (/SovStructureReinforced/i.test(x.type)) {
+      const t = typeof x.data.decloakTime === "number" ? x.data.decloakTime / 1e4 - FILETIME_EPOCH_MS : null;
+      if (t ? now < t + 2 * 36e5 : now - x.t < 48 * 36e5) ev = { kind: "REINFORCED", text: t ? (t > now ? "reinforced · nodes in " + dur(t - now) : "reinforced · nodes now") : "reinforced", live: !!t && t <= now, timer: t };
+    }
+    else if (/SovStructureDestroyed|SovAllClaimLost/i.test(x.type) && now - x.t < 6 * 36e5) ev = { kind: "LOST", text: "sov structure lost", live: false };
+    if (ev) out.set(sys, { ...ev, sys, at: x.t, char: x.char, structure: x.data.structureTypeID });
+  }
+  return out;
+}
 function sovSummary() {
   if (!cfg.showSov) return "";
-  const now = Date.now();
+  const now = Date.now(), ns = notifSovEvents();
   const list = [...fightMap().values()].sort((a, b) => Date.parse(a.start_time) - Date.parse(b.start_time));
-  if (!list.length) return `<div class="spec spec-sov"><span class="lbl">Sov fights</span><span class="none">none in range</span></div>`;
-  return `<div class="spec spec-sov on"><span class="lbl">Sov fights</span>${list.map(c => {
+  const where = id => { const s = state.systems.get(id) || state.watch.get(id); return s?.dist != null ? `${s.dist}j` : s ? "watched" : "off map"; };
+  const items = list.map(c => {
     const s = state.systems.get(c.solar_system_id), st = Date.parse(c.start_time), live = st <= now;
     return `<span class="item${live ? " live" : ""}"><b>${esc(s.name)}</b> ${esc(eventName(c))} · ${s.dist}j · ${live ? "UNDER WAY" : "starts in " + dur(st - now)} · defender ${esc(nm(c.defender_id))}</span>`;
-  }).join("")}</div>`;
+  });
+  for (const e of ns.values()) {
+    if (list.some(c => c.solar_system_id === e.sys)) continue; // CCP's campaign already covers it
+    items.push(`<span class="item${e.live ? " live" : ""}" title="${esc(`From ${nm(e.char)}'s notifications, ${ago(e.at)}${e.timer ? ". Timer: " + fmtEve(e.timer) : ""}`)}"><b>${esc(nm(e.sys))}</b> ${esc(e.text)}${e.structure ? " · " + esc(nm(e.structure)) : ""} · ${where(e.sys)} · <span class="note">notification</span></span>`);
+  }
+  if (!items.length) return `<div class="spec spec-sov"><span class="lbl">Sov fights</span><span class="none">none in range</span></div>`;
+  return `<div class="spec spec-sov on"><span class="lbl">Sov fights</span>${items.join("")}</div>`;
 }
 function sovAlerts() {
   const now = Date.now();
@@ -1781,7 +1811,7 @@ function killStruct(k) { const g = groupInfo[typeGroup[k.ship]]; return g && [65
 $("#sovLegend").hidden = !cfg.showSov;
 
 /* ---------- watched systems (anywhere, on or off the map) ---------- */
-const APP_VERSION = "2.10";
+const APP_VERSION = "2.11";
 let watchGen = 0;
 function watchNames() { return (cfg.watch || "").split(",").map(x => x.trim()).filter(Boolean); }
 async function loadWatch() {
@@ -1855,6 +1885,7 @@ function renderWatch() {
       let vuln = null;
       for (const x of state.sovStructs) if (x.solar_system_id === w.id) { const a = Date.parse(x.vulnerable_start_time), b = Date.parse(x.vulnerable_end_time); if (a <= now && now < b) vuln = b; }
       if (fight) { const st = Date.parse(fight.start_time); chips += `<span class="chip sov" title="${esc(`${eventName(fight)} fight, defender ${nm(fight.defender_id)}`)}">FIGHT ${st <= now ? "LIVE" : dur(st - now)}</span>`; }
+      else if (notifSovEvents().get(w.id)) chips += `<span class="chip sov" title="From your notifications">${esc(notifSovEvents().get(w.id).kind)}</span>`;
       else if (vuln) chips += `<span class="chip sov">VULN ${dur(vuln - now)}</span>`;
       if (live && isEss(rep.msg)) chips += `<span class="chip ess">ESS</span>`;
     }
@@ -2095,7 +2126,7 @@ async function loadNotifs() {
   }
   ls.set("notifSeen", JSON.stringify([...notifSeen].slice(-3000)));
   state.notifAt = Date.now();
-  renderChars(); renderNotifs(); renderDock(); renderMap(); renderTable(); renderWatch();
+  renderChars(); renderNotifs(); renderDock(); renderSummary(); renderMap(); renderTable(); renderWatch();
 }
 function notifAlert(x) {
   if (!cfg.alNotif) return;
